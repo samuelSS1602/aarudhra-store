@@ -34,7 +34,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-medium text-primary">{c.name || "Unnamed customer"}</p>
-                    <p className="truncate text-xs text-muted-foreground">{pii ? formatPhoneForDisplay(c.phoneNumber) : maskPhone(c.phoneNumber)}</p>
+                    <p className="truncate text-xs text-muted-foreground">{c.phoneNumber || c.contactPhone ? (pii ? formatPhoneForDisplay(c.phoneNumber ?? c.contactPhone) : maskPhone(c.phoneNumber ?? c.contactPhone)) : c.email}</p>
                   </div>
                   <Badge tone={c.accountStatus === "active" ? "success" : "danger"} className="capitalize">{c.accountStatus}</Badge>
                 </div>
@@ -57,7 +57,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <tr key={String(c._id)} className="hover:bg-surface-muted/50">
                   <Td>
                     <Link href={`/admin/customers/${c._id}`} className="font-medium text-primary hover:underline">{c.name || "Unnamed customer"}</Link>
-                    <p className="text-xs text-muted-foreground">{pii ? formatPhoneForDisplay(c.phoneNumber) : maskPhone(c.phoneNumber)}{c.email ? ` · ${c.email}` : ""}</p>
+                    <p className="text-xs text-muted-foreground">{pii ? formatPhoneForDisplay(c.phoneNumber ?? c.contactPhone) : maskPhone(c.phoneNumber ?? c.contactPhone)}{c.email ? ` · ${c.email}` : ""}{c.authProvider === "google" ? " · Google" : ""}</p>
                   </Td>
                   <Td className="text-muted-foreground">{formatDate(c.createdAt)}</Td>
                   <Td className="text-right tabular-nums">{c.orderCount}</Td>

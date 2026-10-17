@@ -42,6 +42,12 @@ const schema = z
     TWILIO_AUTH_TOKEN: optional,
     TWILIO_VERIFY_SERVICE_SID: optional,
     OTP_DEV_MODE: boolish,
+    // Customer sign-in methods, comma separated: "google" (default), "phone" or "google,phone".
+    LOGIN_METHODS: z
+      .string()
+      .default("google")
+      .transform((v) => v.split(",").map((m) => m.trim().toLowerCase()).filter(Boolean))
+      .pipe(z.array(z.enum(["google", "phone"])).min(1, "LOGIN_METHODS needs at least one of: google, phone")),
 
     // Firebase Phone Auth (SMS_PROVIDER=firebase). The web config is public by design;
     // the server only verifies Firebase ID tokens, so no service-account key is needed.
@@ -76,7 +82,7 @@ const schema = z
     // pre-renders pages (the build may run with local development settings).
     const building = process.env.NEXT_PHASE === "phase-production-build";
     if (env.NODE_ENV === "production" && !building) {
-      if (env.SMS_PROVIDER === "console") {
+      if (env.SMS_PROVIDER === "console" && env.LOGIN_METHODS.includes("phone")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["SMS_PROVIDER"],
@@ -91,14 +97,12 @@ const schema = z
         });
       }
     }
-    if (
-      env.SMS_PROVIDER === "firebase" &&
-      (!env.NEXT_PUBLIC_FIREBASE_API_KEY || !env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || !env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)
-    ) {
+    const needsFirebase = env.LOGIN_METHODS.includes("google") || (env.LOGIN_METHODS.includes("phone") && env.SMS_PROVIDER === "firebase");
+    if (needsFirebase && (!env.NEXT_PUBLIC_FIREBASE_API_KEY || !env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || !env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["NEXT_PUBLIC_FIREBASE_PROJECT_ID"],
-        message: "Firebase OTP requires NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN and NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+        message: "Google sign-in / Firebase OTP requires NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN and NEXT_PUBLIC_FIREBASE_PROJECT_ID",
       });
     }
     if (env.SMS_PROVIDER === "msg91" && (!env.SMS_API_KEY || !env.SMS_TEMPLATE_ID)) {
@@ -158,10 +162,19 @@ export function isOtpDevMode(): boolean {
   return env.NODE_ENV !== "production" && (env.OTP_DEV_MODE || env.SMS_PROVIDER === "console");
 }
 
-/** Public Firebase web config for the login page, or null when Firebase OTP is not the active provider. */
+/** Which customer sign-in options the login page offers. */
+export function getLoginConfig() {
+  const env = getEnv();
+  const google = env.LOGIN_METHODS.includes("google");
+  const phone = env.LOGIN_METHODS.includes("phone");
+  return { google, phone, phoneViaFirebase: phone && env.SMS_PROVIDER === "firebase", firebase: getFirebaseClientConfig() };
+}
+
+/** Public Firebase web config for the login page, or null when Firebase is not used. */
 export function getFirebaseClientConfig() {
   const env = getEnv();
-  if (env.SMS_PROVIDER !== "firebase") return null;
+  const used = env.LOGIN_METHODS.includes("google") || env.SMS_PROVIDER === "firebase";
+  if (!used || !env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) return null;
   return {
     apiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY!,
     authDomain: env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,

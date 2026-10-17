@@ -45,6 +45,7 @@ export type AddressInput = z.infer<typeof addressSchema>;
 export const profileSchema = z.object({
   name: requiredText("Name", 100),
   email: optionalEmail,
+  contactPhone: z.union([z.literal(""), phoneSchema]).optional(),
   preferences: z
     .object({
       whatsappOrderUpdates: z.boolean().optional(),

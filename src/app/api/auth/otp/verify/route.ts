@@ -12,7 +12,7 @@ export const POST = route(async (req) => {
   const ip = getClientIp(req);
   const { user, isNew } = await verifyOtp({ phone: body.phone, code: body.code, ip });
   const { token, maxAge } = await createCustomerSession(user._id, { ip, userAgent: getUserAgent(req) });
-  const res = json({ ok: true, isNew, user: { id: String(user._id), name: user.name ?? "", phoneNumber: user.phoneNumber } });
+  const res = json({ ok: true, isNew, user: { id: String(user._id), name: user.name ?? "", phoneNumber: user.phoneNumber ?? null, email: user.email ?? null } });
   setSessionCookie(res, CUSTOMER_COOKIE, token, maxAge);
   return res;
 });

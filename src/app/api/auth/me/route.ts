@@ -10,7 +10,7 @@ export const GET = route(async (req) => {
   if (!customer) return json({ user: null, wishlist: [] }, { headers: { "Cache-Control": "no-store" } });
   const wishlist = await getWishlistIds(customer.id);
   return json(
-    { user: { id: customer.id, name: customer.name, phoneNumber: customer.phoneNumber, email: customer.email }, wishlist },
+    { user: { id: customer.id, name: customer.name, phoneNumber: customer.phoneNumber, email: customer.email, contactPhone: customer.contactPhone }, wishlist },
     { headers: { "Cache-Control": "no-store" } },
   );
 });

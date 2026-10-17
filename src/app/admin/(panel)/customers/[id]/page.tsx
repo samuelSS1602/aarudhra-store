@@ -29,9 +29,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     <div>
       <PageHeader
         title={user.name || "Unnamed customer"}
-        description={<span className="flex flex-wrap items-center gap-2">{pii ? formatPhoneForDisplay(user.phoneNumber) : maskPhone(user.phoneNumber)} {user.phoneVerified && <Badge tone="success">Verified</Badge>} <Badge tone={user.accountStatus === "active" ? "primary" : "danger"} className="capitalize">{user.accountStatus}</Badge></span>}
-        actions={pii && (
-          <Button asChild variant="outline"><a href={whatsappLink(user.phoneNumber)} target="_blank" rel="noopener noreferrer"><MessageCircle /> WhatsApp</a></Button>
+        description={<span className="flex flex-wrap items-center gap-2">{pii ? formatPhoneForDisplay(user.phoneNumber ?? user.contactPhone) : maskPhone(user.phoneNumber ?? user.contactPhone)} {user.phoneVerified && <Badge tone="success">Phone verified</Badge>} {user.authProvider === "google" && <Badge tone="info">Google · {user.email}</Badge>} <Badge tone={user.accountStatus === "active" ? "primary" : "danger"} className="capitalize">{user.accountStatus}</Badge></span>}
+        actions={pii && (user.phoneNumber || user.contactPhone) && (
+          <Button asChild variant="outline"><a href={whatsappLink(user.phoneNumber ?? user.contactPhone ?? "")} target="_blank" rel="noopener noreferrer"><MessageCircle /> WhatsApp</a></Button>
         )}
       />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">

@@ -108,7 +108,21 @@ The configuration is validated with Zod when the server starts (`src/instrumenta
 
 Only `NEXT_PUBLIC_*` values reach the browser. All tokens and secrets stay on the server.
 
-## 8. SMS OTP provider
+## 8. Customer sign-in (Google and/or phone OTP)
+
+`LOGIN_METHODS` chooses what customers see on `/login`: `google`, `phone`, or `google,phone`.
+
+**Google sign-in** (`LOGIN_METHODS=google`) is free and needs no SMS setup:
+1. Firebase console → your project → **Build → Authentication → Get started**.
+2. **Sign-in method → Add new provider → Google → Enable**, choose a support email, then **Save**.
+3. **Authentication → Settings → Authorized domains:** add your live domain(s), e.g. `aarudhra-store.vercel.app`. `localhost` is already there.
+4. Set `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID` and `NEXT_PUBLIC_FIREBASE_APP_ID` from **Project settings → Your apps → Web app**.
+
+Google customers have no verified phone number. They enter their mobile number at checkout; it's required for delivery and WhatsApp updates, and is saved to their profile, where they can edit it. The server accepts only Google accounts whose email Google has verified. An existing customer with the same email is linked automatically.
+
+**Phone OTP** (`LOGIN_METHODS=phone`) needs one of the SMS providers below.
+
+### SMS OTP provider
 
 Set `SMS_PROVIDER` to one of the following:
 

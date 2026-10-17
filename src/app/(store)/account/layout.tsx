@@ -21,7 +21,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
             </div>
             <div className="min-w-0">
               <p className="truncate font-semibold">{customer.name || "Welcome!"}</p>
-              <p className="truncate text-sm text-muted-foreground">{formatPhoneForDisplay(customer.phoneNumber)}</p>
+              <p className="truncate text-sm text-muted-foreground">{customer.phoneNumber ? formatPhoneForDisplay(customer.phoneNumber) : customer.email}</p>
             </div>
           </div>
           <AccountNav />

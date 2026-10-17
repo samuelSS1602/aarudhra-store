@@ -79,7 +79,7 @@ export async function getDashboardMetrics(range: { from: Date; to: Date }) {
         },
       ]),
       Order.find().sort({ createdAt: -1 }).limit(8).select("orderNumber customerSnapshot.name totalAmount orderStatus paymentStatus createdAt ownerNotificationStatus").lean(),
-      User.find().sort({ createdAt: -1 }).limit(5).select("name phoneNumber createdAt").lean(),
+      User.find().sort({ createdAt: -1 }).limit(5).select("name phoneNumber email createdAt").lean(),
       AuditLog.find().sort({ createdAt: -1 }).limit(8).select("adminName action resourceType resourceId createdAt").lean(),
     ]);
 

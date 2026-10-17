@@ -18,7 +18,8 @@ export function normalizePhone(input: string, country: CountryCode = DEFAULT_COU
   return parsed.number;
 }
 
-export function formatPhoneForDisplay(e164: string): string {
+export function formatPhoneForDisplay(e164: string | null | undefined): string {
+  if (!e164) return "";
   const parsed = parsePhoneNumberFromString(e164);
   return parsed ? parsed.formatInternational() : e164;
 }

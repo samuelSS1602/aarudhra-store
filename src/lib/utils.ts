@@ -63,7 +63,8 @@ export function initials(name: string): string {
 }
 
 /** Masks a phone number for display in low-privilege contexts: +91 98•••••210 */
-export function maskPhone(phone: string): string {
+export function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return "";
   if (phone.length < 7) return phone;
   return `${phone.slice(0, 5)}${"•".repeat(Math.max(0, phone.length - 8))}${phone.slice(-3)}`;
 }

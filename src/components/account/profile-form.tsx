@@ -8,7 +8,7 @@ import { z } from "zod";
 import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/client-api";
-import { formatPhoneForDisplay } from "@/lib/phone";
+import { formatPhoneForDisplay, normalizePhone } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label, Switch } from "@/components/ui/primitives";
@@ -19,6 +19,7 @@ import { useSession } from "@/components/providers/session-provider";
 const schema = z.object({
   name: z.string().trim().min(1, "Please enter your name").max(100),
   email: z.union([z.literal(""), z.string().trim().email("Enter a valid email address").max(200)]),
+  contactPhone: z.string().trim().refine((v) => v === "" || Boolean(normalizePhone(v)), "Enter a valid 10-digit mobile number"),
   whatsappOrderUpdates: z.boolean(),
   marketingOptIn: z.boolean(),
 });
@@ -27,13 +28,20 @@ type Values = z.infer<typeof schema>;
 export function ProfileForm({
   profile,
 }: {
-  profile: { name: string; email: string; phoneNumber: string; preferences: { whatsappOrderUpdates: boolean; marketingOptIn: boolean } };
+  profile: {
+    name: string;
+    email: string;
+    phoneNumber: string | null;
+    contactPhone: string | null;
+    authProvider: "phone" | "google";
+    preferences: { whatsappOrderUpdates: boolean; marketingOptIn: boolean };
+  };
 }) {
   const router = useRouter();
   const { refresh } = useSession();
   const { register, handleSubmit, formState, setValue, watch, setError } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { name: profile.name, email: profile.email, ...profile.preferences },
+    defaultValues: { name: profile.name, email: profile.email, contactPhone: (profile.contactPhone ?? "").replace(/^\+91/, ""), ...profile.preferences },
   });
   const [saving, setSaving] = React.useState(false);
   const v = watch();
@@ -43,7 +51,7 @@ export function ProfileForm({
     try {
       await apiFetch("/api/account", {
         method: "PATCH",
-        body: { name: values.name, email: values.email, preferences: { whatsappOrderUpdates: values.whatsappOrderUpdates, marketingOptIn: values.marketingOptIn } },
+        body: { name: values.name, email: values.email, ...(profile.phoneNumber ? {} : { contactPhone: values.contactPhone }), preferences: { whatsappOrderUpdates: values.whatsappOrderUpdates, marketingOptIn: values.marketingOptIn } },
       });
       toast.success("Profile saved");
       await refresh();
@@ -65,14 +73,28 @@ export function ProfileForm({
           <Field id="name" label="Full name" error={formState.errors.name?.message}>
             <Input id="name" autoComplete="name" aria-invalid={Boolean(formState.errors.name) || undefined} {...register("name")} />
           </Field>
-          <Field id="phone" label="Mobile number" hint="Verified by OTP. Contact the store to change it.">
-            <div id="phone" className="flex h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface-muted px-3.5 text-[15px]">
-              <CheckCircle2 className="size-4 text-success" /> {formatPhoneForDisplay(profile.phoneNumber)}
-            </div>
-          </Field>
-          <Field id="email" label="Email (optional)" error={formState.errors.email?.message} className="sm:col-span-2">
-            <Input id="email" type="email" autoComplete="email" aria-invalid={Boolean(formState.errors.email) || undefined} {...register("email")} />
-          </Field>
+          {profile.phoneNumber ? (
+            <Field id="phone" label="Mobile number" hint="Verified by OTP. Contact the store to change it.">
+              <div id="phone" className="flex h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface-muted px-3.5 text-[15px]">
+                <CheckCircle2 className="size-4 text-success" /> {formatPhoneForDisplay(profile.phoneNumber)}
+              </div>
+            </Field>
+          ) : (
+            <Field id="contactPhone" label="Mobile number" error={formState.errors.contactPhone?.message} hint="Used for delivery and order updates">
+              <Input id="contactPhone" type="tel" inputMode="tel" autoComplete="tel-national" aria-invalid={Boolean(formState.errors.contactPhone) || undefined} {...register("contactPhone")} />
+            </Field>
+          )}
+          {profile.authProvider === "google" ? (
+            <Field id="email" label="Email" hint="Your Google account email" className="sm:col-span-2">
+              <div id="email" className="flex h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface-muted px-3.5 text-[15px]">
+                <CheckCircle2 className="size-4 text-success" /> {profile.email}
+              </div>
+            </Field>
+          ) : (
+            <Field id="email" label="Email (optional)" error={formState.errors.email?.message} className="sm:col-span-2">
+              <Input id="email" type="email" autoComplete="email" aria-invalid={Boolean(formState.errors.email) || undefined} {...register("email")} />
+            </Field>
+          )}
         </div>
       </Card>
       <Card className="divide-y divide-border">

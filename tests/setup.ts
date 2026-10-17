@@ -8,6 +8,7 @@ Object.assign(process.env, {
   MONGODB_DB_NAME: "aarudhra_test",
   MONGODB_TRANSACTIONS: "auto",
   SMS_PROVIDER: "console",
+  LOGIN_METHODS: "phone", // the OTP code path stays covered even though the store uses Google
   NEXT_PUBLIC_APP_URL: "https://store.test",
   WHATSAPP_ACCESS_TOKEN: "test-token",
   WHATSAPP_PHONE_NUMBER_ID: "1234567890",

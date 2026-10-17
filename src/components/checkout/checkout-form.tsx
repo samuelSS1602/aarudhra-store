@@ -44,7 +44,8 @@ type FormValues = z.infer<typeof formSchema>;
 
 type Profile = {
   name: string;
-  phoneNumber: string;
+  phoneNumber: string | null;
+  contactPhone: string | null;
   email: string;
   addresses: AddressDTO[];
   preferences: { whatsappOrderUpdates: boolean };
@@ -52,7 +53,7 @@ type Profile = {
 
 const emptyAddress = (profile: Profile) => ({
   fullName: profile.name,
-  phone: profile.phoneNumber.replace(/^\+91/, ""),
+  phone: (profile.phoneNumber ?? profile.contactPhone ?? "").replace(/^\+91/, ""),
   line1: "",
   line2: "",
   landmark: "",
@@ -253,11 +254,19 @@ export function CheckoutForm({ profile, codEnabled, whatsappTransactionalAvailab
                   <Field id="customerName" label="Your name" error={formState.errors.customerName?.message}>
                     <Input id="customerName" autoComplete="name" aria-invalid={Boolean(formState.errors.customerName) || undefined} {...register("customerName")} />
                   </Field>
-                  <Field id="verifiedPhone" label="Verified mobile">
-                    <div id="verifiedPhone" className="flex h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface-muted px-3.5 text-[15px]">
-                      <CheckCircle2 className="size-4 text-success" /> {formatPhoneForDisplay(profile.phoneNumber)}
-                    </div>
-                  </Field>
+                  {profile.phoneNumber ? (
+                    <Field id="verifiedPhone" label="Verified mobile">
+                      <div id="verifiedPhone" className="flex h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface-muted px-3.5 text-[15px]">
+                        <CheckCircle2 className="size-4 text-success" /> {formatPhoneForDisplay(profile.phoneNumber)}
+                      </div>
+                    </Field>
+                  ) : (
+                    <Field id="signedInAs" label="Signed in as">
+                      <div id="signedInAs" className="flex h-11 items-center gap-2 truncate rounded-[var(--radius-md)] border border-border bg-surface-muted px-3.5 text-[15px]">
+                        <CheckCircle2 className="size-4 shrink-0 text-success" /> <span className="truncate">{profile.email}</span>
+                      </div>
+                    </Field>
+                  )}
                   <Field id="email" label="Email (optional)" error={formState.errors.email?.message} hint="For order receipts" className="sm:col-span-2">
                     <Input id="email" type="email" autoComplete="email" aria-invalid={Boolean(formState.errors.email) || undefined} {...register("email")} />
                   </Field>

@@ -29,9 +29,15 @@ const NoteSchema = new Schema(
 const UserSchema = new Schema(
   {
     name: { type: String, trim: true, maxlength: 100, default: "" },
-    phoneNumber: { type: String, required: true, unique: true, trim: true },
+    // Verified by OTP (phone sign-in). Absent for Google sign-in accounts.
+    phoneNumber: { type: String, trim: true },
     phoneVerified: { type: Boolean, default: false },
     email: { type: String, trim: true, lowercase: true, maxlength: 200 },
+    // Google sign-in (Firebase Authentication)
+    firebaseUid: { type: String, trim: true },
+    authProvider: { type: String, enum: ["phone", "google"], default: "phone" },
+    // Mobile number given at checkout/profile; not OTP-verified.
+    contactPhone: { type: String, trim: true, maxlength: 20 },
     // Customer accounts only. Staff live in AdminUser and never authenticate via SMS OTP.
     // The field is immutable and never accepted from request bodies.
     role: { type: String, enum: ["customer"], default: "customer", immutable: true },
@@ -48,6 +54,10 @@ const UserSchema = new Schema(
   { timestamps: true },
 );
 
+// Unique only when present (Google accounts have no verified phone; phone accounts no uid).
+UserSchema.index({ phoneNumber: 1 }, { unique: true, partialFilterExpression: { phoneNumber: { $type: "string" } } });
+UserSchema.index({ firebaseUid: 1 }, { unique: true, partialFilterExpression: { firebaseUid: { $type: "string" } } });
+UserSchema.index({ email: 1 });
 UserSchema.index({ createdAt: -1 });
 UserSchema.index({ name: 1 });
 

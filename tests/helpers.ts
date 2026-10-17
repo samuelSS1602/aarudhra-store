@@ -37,7 +37,7 @@ export async function makeProduct(over: Partial<{ name: string; price: number; o
 
 export async function makeCustomer(phone = "+919811100001"): Promise<CurrentCustomer & { _id: Types.ObjectId }> {
   const u = await User.create({ phoneNumber: phone, phoneVerified: true, name: "Test Customer" });
-  return { _id: u._id, id: String(u._id), name: u.name!, phoneNumber: u.phoneNumber, email: null, accountStatus: "active" };
+  return { _id: u._id, id: String(u._id), name: u.name!, phoneNumber: u.phoneNumber!, email: null, contactPhone: null, authProvider: "phone", accountStatus: "active" };
 }
 
 export async function makeAdmin(role: AdminRole = "owner", email = `${role}-${randomUUID().slice(0, 6)}@store.test`, password = "Correct-Horse-9-Battery"): Promise<CurrentAdmin> {

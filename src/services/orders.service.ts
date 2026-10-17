@@ -118,7 +118,7 @@ export async function createOrder(customer: CurrentCustomer, input: CheckoutInpu
           {
             orderNumber,
             userId,
-            customerSnapshot: { name: input.customerName, phone: customer.phoneNumber, email: input.email },
+            customerSnapshot: { name: input.customerName, phone: customer.phoneNumber ?? shippingPhone, email: input.email ?? customer.email ?? undefined },
             items: quote.lines.map((l) => ({
               productId: new Types.ObjectId(l.productId),
               variantId: l.variantId ? new Types.ObjectId(l.variantId) : undefined,
@@ -186,6 +186,7 @@ export async function createOrder(customer: CurrentCustomer, input: CheckoutInpu
       if (user) {
         if (!user.name) user.name = input.customerName;
         if (!user.email && input.email) user.email = input.email;
+        if (!user.phoneNumber && !user.contactPhone) user.contactPhone = shippingPhone;
         if (input.whatsappOptIn) user.set("preferences.whatsappOrderUpdates", true);
         if (input.saveAddress) {
           const a = input.address;

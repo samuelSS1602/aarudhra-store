@@ -14,7 +14,11 @@ import { CUSTOMER_COOKIE, CUSTOMER_SESSION_DAYS } from "./cookies";
 export type CurrentCustomer = {
   id: string;
   name: string;
-  phoneNumber: string;
+  /** OTP-verified phone; null for Google sign-in accounts. */
+  phoneNumber: string | null;
+  /** Unverified mobile given at checkout/profile. */
+  contactPhone: string | null;
+  authProvider: "phone" | "google";
   email?: string | null;
   accountStatus: "active" | "suspended";
 };
@@ -45,11 +49,15 @@ export async function revokeAllCustomerSessions(userId: Types.ObjectId | string)
   await Session.deleteMany({ userId: new Types.ObjectId(String(userId)) });
 }
 
-function toCurrent(user: Pick<UserDoc, "_id" | "name" | "phoneNumber" | "email" | "accountStatus">): CurrentCustomer {
+type SessionUserFields = Pick<UserDoc, "_id" | "name" | "phoneNumber" | "email" | "accountStatus" | "contactPhone" | "authProvider">;
+
+function toCurrent(user: SessionUserFields): CurrentCustomer {
   return {
     id: String(user._id),
     name: user.name ?? "",
-    phoneNumber: user.phoneNumber,
+    phoneNumber: user.phoneNumber ?? null,
+    contactPhone: user.contactPhone ?? null,
+    authProvider: (user.authProvider as CurrentCustomer["authProvider"]) ?? "phone",
     email: user.email ?? null,
     accountStatus: (user.accountStatus as CurrentCustomer["accountStatus"]) ?? "active",
   };
@@ -59,7 +67,7 @@ export async function getCustomerFromToken(token: string | undefined | null): Pr
   if (!token || token.length > 200) return null;
   await connectDB();
   // Session + user in one round-trip (this runs on every page for signed-in customers).
-  const [session] = await Session.aggregate<{ _id: unknown; lastSeenAt?: Date; user?: Pick<UserDoc, "_id" | "name" | "phoneNumber" | "email" | "accountStatus"> }>([
+  const [session] = await Session.aggregate<{ _id: unknown; lastSeenAt?: Date; user?: SessionUserFields }>([
     { $match: { tokenHash: hashToken(token), expiresAt: { $gt: new Date() } } },
     { $limit: 1 },
     {
@@ -67,7 +75,7 @@ export async function getCustomerFromToken(token: string | undefined | null): Pr
         from: User.collection.name,
         localField: "userId",
         foreignField: "_id",
-        pipeline: [{ $project: { name: 1, phoneNumber: 1, email: 1, accountStatus: 1 } }],
+        pipeline: [{ $project: { name: 1, phoneNumber: 1, email: 1, accountStatus: 1, contactPhone: 1, authProvider: 1 } }],
         as: "user",
       },
     },

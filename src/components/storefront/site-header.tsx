@@ -65,7 +65,7 @@ function AccountMenu() {
         <ChevronDown className="size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuLabel>{user.phoneNumber}</DropdownMenuLabel>
+        <DropdownMenuLabel className="truncate">{user.phoneNumber ?? user.email}</DropdownMenuLabel>
         <DropdownMenuItem asChild>
           <Link href="/account"><User /> My account</Link>
         </DropdownMenuItem>

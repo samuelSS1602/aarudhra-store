@@ -1,7 +1,7 @@
 import "server-only";
 import { connectDB } from "@/lib/mongodb";
 import { getEnv, isOtpDevMode } from "@/lib/env";
-import { verifyFirebasePhoneToken } from "@/lib/firebase-verify";
+import { verifyFirebaseToken } from "@/lib/firebase-verify";
 import { normalizePhone } from "@/lib/phone";
 import { hmacHash, randomNumericCode, safeEqual } from "@/lib/security/crypto";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
@@ -34,8 +34,10 @@ export type OtpRequestResult = {
 };
 
 function assertServerOtp() {
+  const env = getEnv();
+  if (!env.LOGIN_METHODS.includes("phone")) throw badRequest("Phone sign-in is not available. Please continue with Google.");
   // With Firebase, the browser talks to Firebase directly; these endpoints are unused.
-  if (getEnv().SMS_PROVIDER === "firebase") throw badRequest("Phone sign-in uses Firebase on this store. Please refresh the page.");
+  if (env.SMS_PROVIDER === "firebase") throw badRequest("Phone sign-in uses Firebase on this store. Please refresh the page.");
 }
 
 export async function requestOtp(input: { phone: string; ip: string }): Promise<OtpRequestResult> {
@@ -176,7 +178,7 @@ export async function verifyOtp(input: { phone: string; code: string; ip: string
 async function signInVerifiedPhone(phone: string) {
   const user = await User.findOneAndUpdate(
     { phoneNumber: phone },
-    { $setOnInsert: { phoneNumber: phone }, $set: { phoneVerified: true, lastLoginAt: new Date() } },
+    { $setOnInsert: { phoneNumber: phone, authProvider: "phone" }, $set: { phoneVerified: true, lastLoginAt: new Date() } },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   if (user.accountStatus !== "active") throw forbidden("This account has been suspended. Please contact the store.");
@@ -190,11 +192,48 @@ async function signInVerifiedPhone(phone: string) {
  * We verify its signature, audience, freshness and that it came from phone sign-in.
  */
 export async function signInWithFirebaseToken(input: { idToken: string; ip: string }) {
-  if (getEnv().SMS_PROVIDER !== "firebase") throw badRequest("Firebase sign-in is not enabled.");
+  const env = getEnv();
   await connectDB();
   await enforceRateLimit(`firebase:verify:ip:${input.ip}`, 40, 60 * 60, "Too many attempts. Please try again later.");
-  const { phoneNumber } = await verifyFirebasePhoneToken(input.idToken);
-  const phone = normalizePhone(phoneNumber);
-  if (!phone) throw new AppError(400, "INVALID_PHONE", "This phone number is not supported.");
-  return signInVerifiedPhone(phone);
+  const identity = await verifyFirebaseToken(input.idToken);
+
+  if (identity.provider === "phone") {
+    if (!env.LOGIN_METHODS.includes("phone") || env.SMS_PROVIDER !== "firebase") throw badRequest("Phone sign-in is not enabled.");
+    const phone = normalizePhone(identity.phoneNumber);
+    if (!phone) throw new AppError(400, "INVALID_PHONE", "This phone number is not supported.");
+    return signInVerifiedPhone(phone);
+  }
+
+  if (!env.LOGIN_METHODS.includes("google")) throw badRequest("Google sign-in is not enabled.");
+  return signInGoogle(identity);
+}
+
+/**
+ * Google sign-in: matched by Firebase uid; an existing customer with the same
+ * (Google-verified) email is linked on first Google sign-in.
+ */
+async function signInGoogle(id: { uid: string; email: string; name: string }) {
+  const now = new Date();
+  let user = await User.findOne({ firebaseUid: id.uid });
+  if (!user) user = await User.findOne({ email: id.email, firebaseUid: { $exists: false } });
+  let isNew = false;
+  if (!user) {
+    try {
+      user = await User.create({ firebaseUid: id.uid, email: id.email, name: id.name, authProvider: "google", lastLoginAt: now });
+      isNew = true;
+    } catch (err) {
+      // Two simultaneous first sign-ins: the other request created the account.
+      if ((err as { code?: number }).code !== 11000) throw err;
+      user = await User.findOne({ firebaseUid: id.uid });
+      if (!user) throw err;
+    }
+  } else {
+    user.firebaseUid = id.uid;
+    user.email = id.email;
+    if (!user.name && id.name) user.name = id.name;
+    user.lastLoginAt = now;
+    await user.save();
+  }
+  if (user.accountStatus !== "active") throw forbidden("This account has been suspended. Please contact the store.");
+  return { user, isNew };
 }

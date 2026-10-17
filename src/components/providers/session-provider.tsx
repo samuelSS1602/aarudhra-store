@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/client-api";
 
-export type SessionUser = { id: string; name: string; phoneNumber: string; email?: string | null };
+export type SessionUser = { id: string; name: string; phoneNumber: string | null; email?: string | null; contactPhone?: string | null };
 
 type SessionContextValue = {
   user: SessionUser | null;

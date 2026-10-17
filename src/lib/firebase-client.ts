@@ -43,6 +43,61 @@ export async function confirmFirebaseOtp(confirmation: ConfirmationResult, code:
   return idToken;
 }
 
+/* ------------------------------ Google sign-in ------------------------------ */
+
+const REDIRECT_FLAG = "aas_google_redirect";
+
+async function tokenAndSignOut(config: FirebaseWebConfig, user: { getIdToken: () => Promise<string> }) {
+  const idToken = await user.getIdToken();
+  // The store uses its own session cookie; drop the Firebase browser session.
+  const auth = await getAuthInstance(config);
+  await auth.signOut().catch(() => undefined);
+  return idToken;
+}
+
+async function googleProvider() {
+  const { GoogleAuthProvider } = await import("firebase/auth");
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
+}
+
+/** Google account picker in a popup; returns a Firebase ID token for the server. */
+export async function signInWithGoogle(config: FirebaseWebConfig): Promise<string> {
+  const auth = await getAuthInstance(config);
+  const { signInWithPopup } = await import("firebase/auth");
+  const cred = await signInWithPopup(auth, await googleProvider());
+  return tokenAndSignOut(config, cred.user);
+}
+
+/** Fallback for browsers that block popups: full-page redirect to Google. */
+export async function startGoogleRedirect(config: FirebaseWebConfig) {
+  const auth = await getAuthInstance(config);
+  const { signInWithRedirect } = await import("firebase/auth");
+  try {
+    sessionStorage.setItem(REDIRECT_FLAG, "1");
+  } catch {
+    /* ignore */
+  }
+  await signInWithRedirect(auth, await googleProvider());
+}
+
+/** After returning from a Google redirect, returns the ID token (or null if none pending). */
+export async function completeGoogleRedirect(config: FirebaseWebConfig): Promise<string | null> {
+  let pending = false;
+  try {
+    pending = sessionStorage.getItem(REDIRECT_FLAG) === "1";
+    sessionStorage.removeItem(REDIRECT_FLAG);
+  } catch {
+    /* ignore */
+  }
+  if (!pending) return null; // avoid loading Firebase on every visit to the login page
+  const auth = await getAuthInstance(config);
+  const { getRedirectResult } = await import("firebase/auth");
+  const result = await getRedirectResult(auth);
+  return result ? tokenAndSignOut(config, result.user) : null;
+}
+
 /** Maps Firebase error codes to friendly messages. */
 export function firebaseErrorMessage(err: unknown): string {
   const code = (err as { code?: string })?.code ?? "";
@@ -57,7 +112,12 @@ export function firebaseErrorMessage(err: unknown): string {
     "auth/network-request-failed": "Network error. Check your connection and try again.",
     "auth/operation-not-allowed": "Phone sign-in is not enabled for this store yet.",
     "auth/billing-not-enabled": "Phone sign-in is not enabled for this store yet.",
-    "auth/unauthorized-domain": "This website address is not authorised for phone sign-in.",
+    "auth/unauthorized-domain": "This website address is not authorised for sign-in yet (add it in Firebase → Authentication → Authorized domains).",
+    "auth/configuration-not-found": "Sign-in is not enabled for this store yet.",
+    "auth/popup-closed-by-user": "Sign-in was cancelled.",
+    "auth/cancelled-popup-request": "Sign-in was cancelled.",
+    "auth/account-exists-with-different-credential": "This email is already linked to another sign-in method.",
+    "auth/user-disabled": "This Google account has been disabled.",
   };
-  return map[code] ?? "We couldn't complete phone verification. Please try again.";
+  return map[code] ?? "We couldn't complete sign-in. Please try again.";
 }

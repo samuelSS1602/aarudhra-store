@@ -173,7 +173,7 @@ export default async function AdminOverview({ searchParams }: { searchParams: SP
               <ul className="space-y-2.5 text-sm">
                 {m.recentCustomers.map((c) => (
                   <li key={String(c._id)} className="flex items-center justify-between gap-2">
-                    <Link href={`/admin/customers/${c._id}`} className="min-w-0 truncate hover:text-primary">{c.name || (showPii ? c.phoneNumber : maskPhone(c.phoneNumber))}</Link>
+                    <Link href={`/admin/customers/${c._id}`} className="min-w-0 truncate hover:text-primary">{c.name || (showPii ? (c.phoneNumber ?? c.email) : maskPhone(c.phoneNumber) || "Google customer")}</Link>
                     <span className="shrink-0 text-xs text-subtle-foreground">{formatDateTime(c.createdAt)}</span>
                   </li>
                 ))}

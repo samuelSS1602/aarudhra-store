@@ -28,7 +28,7 @@ export default async function AddressesAdminPage({ searchParams }: { searchParam
                 const a = r.address as Record<string, string>;
                 return (
                   <tr key={`${r._id}-${i}`}>
-                    <Td><Link href={`/admin/customers/${r._id}`} className="font-medium text-primary hover:underline">{r.name || r.phoneNumber}</Link></Td>
+                    <Td><Link href={`/admin/customers/${r._id}`} className="font-medium text-primary hover:underline">{r.name || r.phoneNumber || r.email}</Link></Td>
                     <Td>{a.fullName}<p className="text-xs text-muted-foreground">{a.phone}</p></Td>
                     <Td className="max-w-72 text-muted-foreground">{a.line1}{a.line2 ? `, ${a.line2}` : ""}{a.landmark ? ` (near ${a.landmark})` : ""}</Td>
                     <Td>{a.city}<p className="text-xs text-muted-foreground">{a.district}, {a.state}</p></Td>

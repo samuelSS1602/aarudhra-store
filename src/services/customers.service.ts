@@ -19,12 +19,14 @@ const MAX_ADDRESSES = 10;
 
 export async function getProfile(userId: string) {
   await connectDB();
-  const u = await User.findById(userId).select("name phoneNumber email addresses preferences createdAt").lean();
+  const u = await User.findById(userId).select("name phoneNumber email addresses preferences createdAt contactPhone authProvider").lean();
   if (!u) throw notFound("Account not found.");
   return {
     id: String(u._id),
     name: u.name ?? "",
-    phoneNumber: u.phoneNumber,
+    phoneNumber: u.phoneNumber ?? null,
+    contactPhone: u.contactPhone ?? null,
+    authProvider: (u.authProvider ?? "phone") as "phone" | "google",
     email: u.email ?? "",
     preferences: { whatsappOrderUpdates: Boolean(u.preferences?.whatsappOrderUpdates), marketingOptIn: Boolean(u.preferences?.marketingOptIn) },
     addresses: (u.addresses ?? []).map(toAddressDTO),
@@ -35,13 +37,21 @@ export async function getProfile(userId: string) {
 /** Only whitelisted fields can change — phone and role are never writable here. */
 export async function updateProfile(
   userId: string,
-  input: { name: string; email?: string; preferences?: { whatsappOrderUpdates?: boolean; marketingOptIn?: boolean } },
+  input: { name: string; email?: string; contactPhone?: string; preferences?: { whatsappOrderUpdates?: boolean; marketingOptIn?: boolean } },
 ) {
   await connectDB();
   const set: Record<string, unknown> = { name: input.name };
   const unset: Record<string, 1> = {};
-  if (input.email) set.email = input.email;
-  else unset.email = 1;
+  const current = await User.findById(userId).select("authProvider").lean();
+  // Google accounts keep their Google email; phone accounts may set one freely.
+  if (current?.authProvider !== "google") {
+    if (input.email) set.email = input.email;
+    else unset.email = 1;
+  }
+  if (input.contactPhone !== undefined) {
+    if (input.contactPhone) set.contactPhone = input.contactPhone;
+    else unset.contactPhone = 1;
+  }
   if (input.preferences?.whatsappOrderUpdates !== undefined) set["preferences.whatsappOrderUpdates"] = input.preferences.whatsappOrderUpdates;
   if (input.preferences?.marketingOptIn !== undefined) set["preferences.marketingOptIn"] = input.preferences.marketingOptIn;
   await User.updateOne({ _id: userId }, { $set: set, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
@@ -122,7 +132,7 @@ export async function listCustomers(opts: { q?: string; status?: string; sort?: 
   if (opts.q) {
     const phone = normalizePhone(opts.q);
     const rx = { $regex: escapeRegex(opts.q), $options: "i" };
-    match.$or = [{ name: rx }, { email: rx }, phone ? { phoneNumber: phone } : { phoneNumber: rx }];
+    match.$or = [{ name: rx }, { email: rx }, phone ? { phoneNumber: phone } : { phoneNumber: rx }, phone ? { contactPhone: phone } : { contactPhone: rx }];
   }
   const sortStage: Record<string, 1 | -1> =
     opts.sort === "orders" ? { orderCount: -1 } : opts.sort === "value" ? { totalValue: -1 } : { createdAt: -1 };
@@ -159,7 +169,7 @@ export async function listCustomers(opts: { q?: string; status?: string; sort?: 
       { $sort: sortStage },
       { $skip: (opts.page - 1) * opts.pageSize },
       { $limit: opts.pageSize },
-      { $project: { name: 1, phoneNumber: 1, email: 1, accountStatus: 1, createdAt: 1, orderCount: 1, totalValue: 1, lastOrderAt: 1, addressCount: 1 } },
+      { $project: { name: 1, phoneNumber: 1, contactPhone: 1, authProvider: 1, email: 1, accountStatus: 1, createdAt: 1, orderCount: 1, totalValue: 1, lastOrderAt: 1, addressCount: 1 } },
     ]),
     User.countDocuments(match),
   ]);
@@ -225,9 +235,9 @@ export async function listAllAddresses(opts: { q?: string; page: number; pageSiz
       { $sort: { "addresses.updatedAt": -1 } },
       { $skip: (opts.page - 1) * opts.pageSize },
       { $limit: opts.pageSize },
-      { $project: { name: 1, phoneNumber: 1, address: "$addresses" } },
+      { $project: { name: 1, phoneNumber: 1, email: 1, address: "$addresses" } },
     ] as never[]),
     User.aggregate([...pipeline, { $count: "n" }] as never[]),
   ]);
-  return { items: rows as { _id: Types.ObjectId; name: string; phoneNumber: string; address: Record<string, unknown> }[], total: (countRes[0] as { n?: number })?.n ?? 0 };
+  return { items: rows as { _id: Types.ObjectId; name: string; phoneNumber?: string; email?: string; address: Record<string, unknown> }[], total: (countRes[0] as { n?: number })?.n ?? 0 };
 }
