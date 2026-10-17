@@ -7,6 +7,9 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { DynamicIcon } from "@/components/storefront/icons";
 import { EmptyState } from "@/components/ui/display";
 
+// Pre-built and served from cache; rebuilt on any catalogue/settings change (see lib/cache.ts).
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: "Shop by category",
   description: "Explore school stationery, office supplies, art & craft, kitchen, cleaning and home essentials at Aarudhra Smart Store.",

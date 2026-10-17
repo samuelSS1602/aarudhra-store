@@ -11,7 +11,6 @@ export async function register() {
     const missing: string[] = [];
     if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) missing.push("WhatsApp Cloud API (order notifications)");
     if (!env.WHATSAPP_APP_SECRET) missing.push("WHATSAPP_APP_SECRET (webhook verification)");
-    if (!env.CLOUDINARY_CLOUD_NAME) missing.push("Cloudinary (product image uploads)");
     if (missing.length) console.warn(`[config] Optional integrations not configured: ${missing.join("; ")}`);
   } catch (err) {
     console.error(String(err instanceof Error ? err.message : err));

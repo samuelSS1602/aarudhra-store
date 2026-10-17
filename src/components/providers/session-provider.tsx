@@ -9,6 +9,8 @@ export type SessionUser = { id: string; name: string; phoneNumber: string; email
 
 type SessionContextValue = {
   user: SessionUser | null;
+  /** "loading" until the browser has checked who is signed in (pages are pre-built and shared). */
+  status: "loading" | "ready";
   wishlist: Set<string>;
   refresh: () => Promise<void>;
   setUser: (u: SessionUser | null) => void;
@@ -18,24 +20,28 @@ type SessionContextValue = {
 
 const SessionContext = React.createContext<SessionContextValue | null>(null);
 
-export function SessionProvider({ initialUser, children }: { initialUser: SessionUser | null; children: React.ReactNode }) {
+export function SessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = React.useState<SessionUser | null>(initialUser);
+  const [user, setUser] = React.useState<SessionUser | null>(null);
+  const [status, setStatus] = React.useState<"loading" | "ready">("loading");
   const [wishlist, setWishlist] = React.useState<Set<string>>(new Set());
 
   const refresh = React.useCallback(async () => {
     const data = await apiFetch<{ user: SessionUser | null; wishlist: string[] }>("/api/auth/me").catch(() => null);
-    if (!data) return;
-    setUser(data.user);
-    setWishlist(new Set(data.wishlist));
+    if (data) {
+      setUser(data.user);
+      setWishlist(new Set(data.wishlist));
+    }
+    setStatus("ready");
   }, []);
 
   React.useEffect(() => {
-    if (initialUser) void refresh();
-  }, [initialUser, refresh]);
+    void refresh();
+  }, [refresh]);
 
   const toggleWishlist = React.useCallback(
     async (productId: string) => {
+      if (status === "loading") return;
       if (!user) {
         toast("Sign in to save items to your wishlist", {
           action: { label: "Sign in", onClick: () => router.push(`/login?next=${encodeURIComponent(location.pathname)}`) },
@@ -64,7 +70,7 @@ export function SessionProvider({ initialUser, children }: { initialUser: Sessio
         toast.error(err instanceof Error ? err.message : "Couldn't update wishlist");
       }
     },
-    [user, wishlist, router],
+    [user, status, wishlist, router],
   );
 
   const logout = React.useCallback(async () => {
@@ -76,8 +82,8 @@ export function SessionProvider({ initialUser, children }: { initialUser: Sessio
   }, [router]);
 
   const value = React.useMemo(
-    () => ({ user, wishlist, refresh, setUser, toggleWishlist, logout }),
-    [user, wishlist, refresh, toggleWishlist, logout],
+    () => ({ user, status, wishlist, refresh, setUser, toggleWishlist, logout }),
+    [user, status, wishlist, refresh, toggleWishlist, logout],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

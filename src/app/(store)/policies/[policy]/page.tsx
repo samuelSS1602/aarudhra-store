@@ -10,6 +10,13 @@ const POLICIES = {
   returns: { title: "Returns & cancellations" },
 } as const;
 
+// Pre-built and served from cache; rebuilt on any catalogue/settings change (see lib/cache.ts).
+export const revalidate = 3600;
+
+export function generateStaticParams() {
+  return Object.keys(POLICIES).map((policy) => ({ policy }));
+}
+
 type Props = { params: Promise<{ policy: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

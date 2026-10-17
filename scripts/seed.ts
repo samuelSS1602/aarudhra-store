@@ -1,8 +1,8 @@
 /**
  * Seeds the starting categories and DEMO products.
  *
- *   npm run seed                 # categories + demo products (skips existing slugs)
- *   npm run seed -- --categories-only
+ *   npm run seed                 # starting categories only (safe to re-run)
+ *   npm run seed -- --demo       # also add clearly-labelled DEMO products for testing
  *   npm run seed -- --clear-demo # removes demo products that were never ordered
  *
  * Every demo product has `isDemo: true`, brand "Demo" and a description beginning
@@ -20,7 +20,8 @@ import { InventoryLog } from "../src/models/misc";
 
 const { values } = parseArgs({
   options: {
-    "categories-only": { type: "boolean", default: false },
+    demo: { type: "boolean", default: false },
+    "categories-only": { type: "boolean", default: false }, // kept for compatibility
     "clear-demo": { type: "boolean", default: false },
     force: { type: "boolean", default: false },
   },
@@ -137,7 +138,10 @@ async function main() {
     catIds.set(c.name, String(doc._id));
   }
   console.log(`✔ ${CATEGORIES.length} categories ready`);
-  if (values["categories-only"]) return;
+  if (values["categories-only"] || !values.demo) {
+    console.log("ℹ Demo products not added. Use `npm run seed -- --demo` to add sample products for testing.");
+    return;
+  }
 
   let created = 0;
   for (const [i, d] of DEMO.entries()) {

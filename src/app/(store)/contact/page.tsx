@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/display";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 
+// Pre-built and served from cache; rebuilt on any catalogue/settings change (see lib/cache.ts).
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Contact & store location",
   description: "Visit Aarudhra Smart Store at New Ammumall Complex, New Dharapuram Road, opposite Town Police Station, Indra Nagar, Palani, Tamil Nadu 624601.",

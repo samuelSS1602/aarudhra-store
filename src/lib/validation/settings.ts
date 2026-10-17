@@ -5,6 +5,8 @@ import { ORDER_STATUSES } from "@/lib/constants";
 const t = (max: number) => z.string().trim().max(max);
 const paise = z.coerce.number().int().min(0).max(1_000_000_000);
 const optionalUrl = z.union([z.literal(""), z.string().trim().url().max(500)]);
+/** Uploaded image: a Cloudinary/HTTPS URL or a photo stored in MongoDB (/media/<id>.webp). */
+const imageUrl = z.union([z.literal(""), z.string().trim().url().max(1000), z.string().trim().regex(/^\/media\/[a-f0-9]{24}\.webp$/i)]);
 const internalHref = z
   .string()
   .trim()
@@ -27,7 +29,7 @@ const optionalPhone = z
 export const generalSettingsSchema = z.object({
   storeName: t(80).min(1, "Store name is required"),
   tagline: t(120),
-  logoUrl: z.union([z.literal(""), z.string().trim().url().max(1000)]),
+  logoUrl: imageUrl,
   description: t(600),
   address: z.object({
     line1: t(200).min(1),
@@ -102,7 +104,7 @@ export const homepageSettingsSchema = z.object({
     ctaHref: internalHref,
     secondaryCtaLabel: t(40),
     secondaryCtaHref: internalHref,
-    imageUrl: z.union([z.literal(""), z.string().trim().url().max(1000)]),
+    imageUrl: imageUrl,
   }),
   banners: z
     .array(
@@ -110,7 +112,7 @@ export const homepageSettingsSchema = z.object({
         title: t(80).min(1),
         subtitle: t(160),
         href: internalHref,
-        imageUrl: z.union([z.literal(""), z.string().trim().url().max(1000)]),
+        imageUrl: imageUrl,
         tone: z.enum(["green", "gold", "charcoal", "lime"]),
       }),
     )

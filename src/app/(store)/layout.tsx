@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { getCurrentCustomer } from "@/lib/auth/session";
 import { getSettings } from "@/services/settings.service";
 import { listActiveCategoriesCached } from "@/services/categories.service";
 import { SessionProvider } from "@/components/providers/session-provider";
@@ -10,15 +9,15 @@ import { SiteFooter } from "@/components/storefront/site-footer";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { localBusinessJsonLd, JsonLd } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
-
+// No per-request data here: pages under this layout can be pre-built and served
+// from cache. The signed-in customer is resolved in the browser (SessionProvider).
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
-  const [settings, categories, customer] = await Promise.all([getSettings(), listActiveCategoriesCached(), getCurrentCustomer()]);
+  const [settings, categories] = await Promise.all([getSettings(), listActiveCategoriesCached()]);
   const nav = categories.map((c) => ({ name: c.name, slug: c.slug }));
   const announcement = settings.homepage.announcement;
 
   return (
-    <SessionProvider initialUser={customer ? { id: customer.id, name: customer.name, phoneNumber: customer.phoneNumber, email: customer.email } : null}>
+    <SessionProvider>
       <CartProvider>
         <MotionProvider>
           <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-white">

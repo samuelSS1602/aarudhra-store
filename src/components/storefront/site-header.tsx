@@ -48,7 +48,8 @@ function CartButton({ className }: { className?: string }) {
 }
 
 function AccountMenu() {
-  const { user, logout } = useSession();
+  const { user, status, logout } = useSession();
+  if (status === "loading") return <span className="hidden h-10 w-24 md:block" aria-hidden />;
   if (!user) {
     return (
       <Link href="/login" className="hidden h-10 items-center gap-2 rounded-full px-3 text-sm font-semibold text-foreground hover:bg-surface-muted md:flex">

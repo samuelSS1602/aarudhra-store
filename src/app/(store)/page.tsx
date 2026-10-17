@@ -11,7 +11,8 @@ import { ProductRail, SectionHeading } from "@/components/storefront/sections";
 import { Reveal } from "@/components/storefront/reveal";
 import { NewsletterForm } from "@/components/storefront/newsletter-form";
 
-export const dynamic = "force-dynamic";
+// Pre-built and served from cache; rebuilt on any catalogue/settings change (see lib/cache.ts).
+export const revalidate = 300;
 
 const BANNER_TONES = {
   green: "bg-primary text-primary-foreground",

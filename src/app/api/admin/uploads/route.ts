@@ -2,6 +2,8 @@ import { json, route } from "@/lib/api";
 import { AppError, badRequest } from "@/lib/errors";
 import { requireAdmin } from "@/lib/auth/admin-session";
 import { MAX_UPLOAD_BYTES, uploadImage, validateImageFile } from "@/lib/cloudinary";
+import { imageStorageBackend } from "@/lib/env";
+import { storeImage } from "@/lib/media-store";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { audit } from "@/services/audit.service";
 
@@ -26,7 +28,8 @@ export const POST = route(async (req) => {
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const type = validateImageFile(file, bytes);
-  const uploaded = await uploadImage(bytes, type, folder);
-  await audit(admin, "upload.image", "image", uploaded.publicId, { folder, bytes: uploaded.bytes });
+  const backend = imageStorageBackend();
+  const uploaded = backend === "cloudinary" ? await uploadImage(bytes, type, folder) : await storeImage(bytes, { folder, uploadedBy: admin.id });
+  await audit(admin, "upload.image", "image", uploaded.publicId, { folder, bytes: uploaded.bytes, backend });
   return json({ image: { url: uploaded.url, publicId: uploaded.publicId, width: uploaded.width, height: uploaded.height } }, { status: 201 });
 });

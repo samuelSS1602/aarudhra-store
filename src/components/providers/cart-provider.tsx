@@ -49,7 +49,7 @@ function readLocal(): { items: CartItem[]; couponCode: string | null } {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useSession();
+  const { user, status } = useSession();
   const [items, setItems] = React.useState<CartItem[]>([]);
   const [couponCode, setCouponCodeState] = React.useState<string | null>(null);
   const [ready, setReady] = React.useState(false);
@@ -59,6 +59,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   // Load the right cart whenever the signed-in user changes.
   React.useEffect(() => {
+    if (status !== "ready") return; // wait until we know who is signed in
     const uid = user?.id ?? null;
     if (syncedUser.current === uid) return;
     syncedUser.current = uid;
@@ -90,7 +91,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, status]);
 
   // Persist changes (debounced for the server).
   React.useEffect(() => {

@@ -252,19 +252,25 @@ npm run admin:create -- --email owner@yourdomain.in --name "Store Owner"
 
 **Roles:** Owner (everything, including staff accounts) › Administrator (refunds, overrides, cost prices, security settings, audit logs) › Store manager (products, inventory, coupons, cancellations, analytics) › Staff (process orders, view data). Every permission is enforced on the server.
 
-## 12. Image storage (Cloudinary)
+## 12. Image storage
 
-1. Create an account at <https://cloudinary.com> and open the **Dashboard**.
-2. Copy the cloud name, API key and API secret into `CLOUDINARY_*`.
+**Default: MongoDB, with no extra setup.** Product, category and banner photos are stored in your Atlas database using GridFS (a `media` bucket kept separate from product records) and served from `/media/<id>.webp`.
 
-Uploads go through `/api/admin/uploads`. The server checks the file's actual type by inspecting its bytes (JPEG, PNG, WebP or AVIF only), enforces a 4 MB limit, and uploads with a signed request. MongoDB stores only the URL and metadata. Products without photos show a generated placeholder rather than a stock photo.
+- Every upload is checked as a real image (JPEG, PNG, WebP or AVIF; max 4 MB). It is rotated upright, stripped of metadata such as GPS location, resized to fit 1600×1600, and saved as WebP. A typical product photo ends up around 100–200 KB.
+- Photos never change after upload, so they're served with year-long browser caching. `next/image` also generates smaller versions for phones.
+- When you remove a photo from a product, or delete the product, the stored file is deleted too.
+- **Capacity:** Atlas's free M0 tier has 512 MB in total, enough for roughly 2,000–3,000 product photos plus your store data. Upgrade the cluster, or switch to Cloudinary, if you need more.
+
+**Optional: Cloudinary.** Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`, and new uploads go to Cloudinary automatically; existing MongoDB photos keep working. To force one backend, set `IMAGE_STORAGE=mongodb` or `IMAGE_STORAGE=cloudinary`.
+
+Products without photos show a generated placeholder rather than a stock photo.
 
 ## 13. Local development
 
 ```bash
 cp .env.example .env.local      # then fill in MONGODB_URI and the two secrets
 npm run db:indexes              # create indexes, including TTL indexes
-npm run seed                    # 12 categories + clearly labelled DEMO products
+npm run seed                    # the 12 starting categories (no products)
 npm run admin:create -- --email you@example.com --name "Your Name"
 npm run dev                     # http://localhost:3000
 ```
@@ -277,7 +283,7 @@ Other commands:
 npm test                 # Vitest suite (uses an in-memory MongoDB replica set)
 npm run typecheck        # tsc --noEmit
 npm run lint
-npm run seed -- --categories-only
+npm run seed -- --demo           # optional: add clearly labelled DEMO products for testing
 npm run seed -- --clear-demo     # remove demo products before launch
 ```
 
@@ -290,7 +296,16 @@ npm run build
 npm start
 ```
 
-The build runs type checking and linting.
+The build runs type checking and linting. It also **pre-builds the storefront pages** (home, categories, product pages, contact, policies, cart), so it needs `MONGODB_URI` to reach your database.
+
+**How the live site stays fast and current**
+- Pre-built pages are served from cache: about 10 ms on the server here, and from Vercel's edge network when deployed.
+- They are rebuilt automatically the moment an admin changes products, categories, stock or settings, or an order changes stock. Even without changes they refresh every 1–60 minutes.
+- Search and filter results, account pages and checkout are always generated live.
+- The signed-in customer is detected in the browser, so pre-built pages can be shared by everyone and private data never ends up in a cached page.
+- Customers can install the store on their phone's home screen via the web app manifest.
+
+Production checks (for example, rejecting `SMS_PROVIDER=console`) run when the server starts, not during the build.
 
 ## 15. Vercel deployment
 

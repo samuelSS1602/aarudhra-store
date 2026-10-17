@@ -10,6 +10,14 @@ import { ProductGallery } from "@/components/products/product-gallery";
 import { PurchasePanel } from "@/components/products/purchase-panel";
 import { ProductRail } from "@/components/storefront/sections";
 
+// Pre-built and served from cache; rebuilt on any catalogue/settings change (see lib/cache.ts).
+export const revalidate = 300;
+
+/** Product pages are built on first visit, then cached (none at build time). */
+export function generateStaticParams() {
+  return [];
+}
+
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

@@ -66,11 +66,16 @@ const schema = z
     CLOUDINARY_API_KEY: optional,
     CLOUDINARY_API_SECRET: optional,
     CLOUDINARY_FOLDER: z.string().default("aarudhra-store"),
+    // Where uploaded photos are stored. auto = Cloudinary when configured, otherwise MongoDB.
+    IMAGE_STORAGE: z.enum(["auto", "mongodb", "cloudinary"]).default("auto"),
 
     CRON_SECRET: optional,
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === "production") {
+    // Production-only rules are enforced when the server starts, not while `next build`
+    // pre-renders pages (the build may run with local development settings).
+    const building = process.env.NEXT_PHASE === "phase-production-build";
+    if (env.NODE_ENV === "production" && !building) {
       if (env.SMS_PROVIDER === "console") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -168,6 +173,13 @@ export function getFirebaseClientConfig() {
 export function isWhatsAppConfigured(): boolean {
   const env = getEnv();
   return Boolean(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID);
+}
+
+export function imageStorageBackend(): "mongodb" | "cloudinary" {
+  const mode = getEnv().IMAGE_STORAGE;
+  if (mode === "mongodb") return "mongodb";
+  if (mode === "cloudinary") return "cloudinary";
+  return isCloudinaryConfigured() ? "cloudinary" : "mongodb";
 }
 
 export function isCloudinaryConfigured(): boolean {

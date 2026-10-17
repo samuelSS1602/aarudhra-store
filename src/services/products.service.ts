@@ -13,6 +13,16 @@ import { Order } from "@/models/Order";
 import { InventoryLog } from "@/models/misc";
 import { audit } from "./audit.service";
 import { cached, TAGS } from "@/lib/cache";
+import { deleteImage } from "@/lib/media-store";
+
+/** Deletes MongoDB-stored photos that are no longer referenced (keeps the free 512 MB tier tidy). */
+async function releaseImages(before: { publicId?: string | null }[], after: { publicId?: string | null }[] = []) {
+  const keep = new Set(after.map((i) => i.publicId).filter(Boolean));
+  for (const img of before) {
+    const pid = img.publicId ?? "";
+    if (pid.startsWith("mongo:") && !keep.has(pid)) await deleteImage(pid.slice("mongo:".length));
+  }
+}
 
 /** Fields that are safe to send to customers (costPrice is excluded by schema `select: false`). */
 const PUBLIC_FIELDS =
@@ -310,6 +320,7 @@ export async function updateProduct(id: string, input: ProductInput, admin: Curr
   }
 
   const before = { name: product.name, price: product.price, originalPrice: product.originalPrice, status: product.status, sku: product.sku };
+  const previousImages = product.images.map((i) => ({ publicId: i.publicId }));
   const existingVariants = new Map(product.variants.map((v) => [String(v._id), v]));
   const newVariantLogs: { sku: string; stock: number }[] = [];
 
@@ -344,6 +355,7 @@ export async function updateProduct(id: string, input: ProductInput, admin: Curr
 
   product.set(update);
   await product.save();
+  await releaseImages(previousImages, input.images);
 
   for (const log of newVariantLogs) {
     const v = product.variants.find((x) => x.sku === log.sku);
@@ -373,6 +385,7 @@ export async function deleteProduct(id: string, admin: CurrentAdmin) {
   const ordered = await Order.exists({ "items.productId": p._id });
   if (ordered) throw conflict("This product appears in past orders and can't be deleted. Archive it instead.");
   await Product.deleteOne({ _id: p._id });
+  await releaseImages(p.images ?? []);
   await audit(admin, "product.delete", "product", p._id, { name: p.name, sku: p.sku });
 }
 

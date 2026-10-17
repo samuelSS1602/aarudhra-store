@@ -54,11 +54,15 @@ export const pageQuery = {
 };
 
 export const imageSchema = z.object({
+  // Only images uploaded through the store: Cloudinary or MongoDB (/media/<id>.webp).
   url: z
     .string()
-    .url()
+    .trim()
     .max(1000)
-    .refine((u) => u.startsWith("https://res.cloudinary.com/") || u.startsWith("/"), "Images must be uploaded to the store's image storage"),
+    .refine(
+      (u) => u.startsWith("https://res.cloudinary.com/") || /^\/media\/[a-f0-9]{24}\.webp$/i.test(u),
+      "Images must be uploaded to the store's image storage",
+    ),
   publicId: trimmed(300).optional(),
   alt: trimmed(200).optional().default(""),
   width: z.number().int().positive().optional(),
