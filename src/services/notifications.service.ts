@@ -6,7 +6,8 @@ import { logger } from "@/lib/logger";
 import { conflict, notFound } from "@/lib/errors";
 import type { OrderStatus } from "@/lib/constants";
 import type { StoreSettings } from "@/lib/settings-defaults";
-import { sendTemplateMessage, sendTextMessage, WhatsAppError, type SendResult } from "@/lib/whatsapp/client";
+import { sendImageMessage, sendTemplateMessage, sendTextMessage, WhatsAppError, type SendResult } from "@/lib/whatsapp/client";
+import { jpegImageUrl } from "@/lib/utils";
 import {
   customerConfirmationParams,
   ownerTemplateParams,
@@ -135,6 +136,28 @@ export async function recordStatusUpdateNotification(order: Pick<OrderDoc, "_id"
   });
 }
 
+/**
+ * After the owner alert, sends each ordered product's photo (up to 5) with a caption.
+ * Best effort: the alert has already gone out, so a failed photo never retries the alert.
+ * Meta downloads the photo itself, so this only runs on a public HTTPS site.
+ */
+async function sendProductPhotos(recipient: string, order: OrderDoc) {
+  const base = getEnv().NEXT_PUBLIC_APP_URL;
+  if (!base.startsWith("https://")) return;
+  for (const item of order.items.filter((i) => i.image).slice(0, 5)) {
+    try {
+      await sendImageMessage({
+        to: recipient,
+        link: new URL(jpegImageUrl(item.image!), base).toString(),
+        caption: `${order.orderNumber} · ${item.quantity} × ${item.name}${item.variantName ? ` (${item.variantName})` : ""}`,
+      });
+    } catch (err) {
+      logger.warn("Product photo not sent to owner", { orderNumber: order.orderNumber, error: err instanceof Error ? err.message : String(err) });
+      return; // the rest would fail the same way (e.g. outside the 24-hour window)
+    }
+  }
+}
+
 async function deliver(log: NotificationLogDoc, order: OrderDoc, settings: StoreSettings): Promise<SendResult> {
   const t = templateConfig(settings);
   const support = settings.general.whatsappNumber || settings.general.supportPhone;
@@ -143,9 +166,15 @@ async function deliver(log: NotificationLogDoc, order: OrderDoc, settings: Store
 
   if (log.type === "owner_new_order") {
     const adminUrl = appUrl(`/admin/orders/${order._id}`);
-    if (log.template === "text:new_order") return sendTextMessage({ to: log.recipient, body: ownerTextMessage(msgOrder, adminUrl) });
-    if (!log.template) throw new WhatsAppError("Owner template name is not configured", "TEMPLATE_NOT_CONFIGURED", false);
-    return sendTemplateMessage({ to: log.recipient, templateName: log.template, language: t.language, bodyParams: ownerTemplateParams(msgOrder, adminUrl) });
+    let result: SendResult;
+    if (log.template === "text:new_order") {
+      result = await sendTextMessage({ to: log.recipient, body: ownerTextMessage(msgOrder, adminUrl, getEnv().NEXT_PUBLIC_APP_URL.startsWith("https://") ? getEnv().NEXT_PUBLIC_APP_URL : undefined) });
+    } else {
+      if (!log.template) throw new WhatsAppError("Owner template name is not configured", "TEMPLATE_NOT_CONFIGURED", false);
+      result = await sendTemplateMessage({ to: log.recipient, templateName: log.template, language: t.language, bodyParams: ownerTemplateParams(msgOrder, adminUrl) });
+    }
+    await sendProductPhotos(log.recipient, order);
+    return result;
   }
   if (log.type === "customer_order_confirmation") {
     return sendTemplateMessage({ to: log.recipient, templateName: log.template!, language: t.language, bodyParams: customerConfirmationParams(msgOrder, trackingUrl, support) });

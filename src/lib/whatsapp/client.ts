@@ -107,6 +107,11 @@ export function sendTextMessage(opts: { to: string; body: string }) {
   return post({ to: toWaRecipient(opts.to), type: "text", text: { preview_url: false, body: opts.body.slice(0, 4096) } });
 }
 
+/** Photo with a caption. `link` must be a public HTTPS JPEG/PNG URL. Same 24-hour window rule as text. */
+export function sendImageMessage(opts: { to: string; link: string; caption?: string }) {
+  return post({ to: toWaRecipient(opts.to), type: "image", image: { link: opts.link, ...(opts.caption ? { caption: opts.caption.slice(0, 1024) } : {}) } });
+}
+
 /** Verifies Meta's X-Hub-Signature-256 header (HMAC-SHA256 of the raw body with the app secret). */
 export function verifyWebhookSignature(rawBody: string, header: string | null, appSecret: string | undefined): boolean {
   if (!appSecret || !header || !header.startsWith("sha256=")) return false;

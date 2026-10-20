@@ -279,6 +279,16 @@ npm run admin:create -- --email owner@yourdomain.in --name "Store Owner"
 
 Products without photos show a generated placeholder rather than a stock photo.
 
+### Homepage store photos
+
+The homepage hero slideshow, the "Inside our store" gallery and the "Visit us" photo use real store photos bundled with the site (not uploaded through the admin). To replace them:
+
+1. Put JPEG/PNG photos in `assets/store-photos/` (this folder is git-ignored). They show in file-name order, so prefix names with `01-`, `02-` and so on. Name the shop-front photo `storefront.jpg`. A name containing `counter` puts that photo in the gallery only.
+2. Run `npm run photos:build`. This writes optimised WebP files to `public/store/` and regenerates `src/components/storefront/store-photos.ts`.
+3. Commit `public/store/` and the generated file, then deploy.
+
+To set captions, edit `CAPTIONS` in `scripts/build-store-photos.ts`. If **Settings → Homepage → Hero image** is set in the admin, that image is shown as the first slide.
+
 ## 13. Local development
 
 ```bash

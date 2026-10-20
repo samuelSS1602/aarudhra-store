@@ -17,6 +17,56 @@ import { Category } from "../src/models/Category";
 import { Product } from "../src/models/Product";
 import { Order } from "../src/models/Order";
 import { InventoryLog } from "../src/models/misc";
+import { deleteImage, storeImage } from "../src/lib/media-store";
+import { productSvg, type ArtKind } from "./demo-art";
+
+const SWATCHES = ["#e74c3c", "#f39c12", "#f1c40f", "#27ae60", "#16a085", "#2980b9", "#8e44ad", "#d35400", "#2c3e50", "#e84393", "#00b894", "#6c5ce7"];
+
+/** Illustration for each DEMO product, in the same order as DEMO below. */
+const ART: [ArtKind, string, string[]?][] = [
+  ["notebook", "#2b5fd0"],
+  ["notebook", "#16a085"],
+  ["notebook", "#8e2b4f"],
+  ["ream", "#1e63b0"],
+  ["pens", "#1e63b0", ["#1e63b0", "#1e63b0", "#1e63b0"]],
+  ["pens", "#2c3e50", ["#1e63b0", "#2c3e50", "#1e63b0"]],
+  ["pencils", "#f4c430"],
+  ["marker", "#2c3e50"],
+  ["geometry", "#2b3590"],
+  ["eraser", "#2b5fd0", ["#e74c3c", "#2b5fd0", "#27ae60"]],
+  ["sharpener", "#8a92a3"],
+  ["scale", "#00a8cc"],
+  ["crayons", "#e67e22", SWATCHES],
+  ["watercolour", "#2980b9", SWATCHES],
+  ["glue", "#27ae60"],
+  ["paper", "#e84393", ["#e74c3c", "#f39c12", "#f1c40f", "#27ae60", "#16a085", "#2980b9"]],
+  ["folder", "#8e44ad"],
+  ["stapler", "#c0392b"],
+  ["folder", "#00a8cc"],
+  ["containers", "#00a8cc", ["#e74c3c", "#f39c12", "#f1c40f"]],
+  ["ladle", "#7f8c8d"],
+  ["peeler", "#27ae60"],
+  ["cloth", "#2980b9", ["#e74c3c", "#f39c12", "#f1c40f"]],
+  ["brush", "#8e44ad"],
+  ["scrub", "#27ae60"],
+  ["storage", "#00a8cc"],
+  ["organiser", "#2c3e50", ["#1e63b0", "#c0392b"]],
+  ["hooks", "#5b6474"],
+  ["hooks", "#1e63b0"],
+  ["bottle", "#7f8c8d"],
+  ["towel", "#16a085"],
+  ["soap", "#00b894"],
+  ["matchbox", "#c0392b"],
+  ["kit", "#2b5fd0"],
+];
+
+/** Renders the demo illustration and stores it like an uploaded photo (MongoDB GridFS, WebP). */
+async function demoImage(index: number, name: string) {
+  const [kind, color, alt] = ART[index] ?? ["notebook", "#2b5fd0"];
+  const svg = productSvg(kind, color, alt ?? SWATCHES);
+  const img = await storeImage(new Uint8Array(Buffer.from(svg)), { folder: "products", uploadedBy: "seed" });
+  return { url: img.url, publicId: img.publicId, alt: `${name} (illustration)`, width: img.width, height: img.height };
+}
 
 const { values } = parseArgs({
   options: {
@@ -112,7 +162,7 @@ async function main() {
   await connectDB();
 
   if (values["clear-demo"]) {
-    const demo = await Product.find({ isDemo: true }).select("_id name").lean();
+    const demo = await Product.find({ isDemo: true }).select("_id name images").lean();
     let removed = 0;
     for (const p of demo) {
       if (await Order.exists({ "items.productId": p._id })) {
@@ -120,6 +170,7 @@ async function main() {
       } else {
         await Product.deleteOne({ _id: p._id });
         await InventoryLog.deleteMany({ productId: p._id });
+        for (const img of p.images ?? []) if (img.publicId?.startsWith("mongo:")) await deleteImage(img.publicId.slice(6));
         removed++;
       }
     }
@@ -144,9 +195,17 @@ async function main() {
   }
 
   let created = 0;
+  let illustrated = 0;
   for (const [i, d] of DEMO.entries()) {
     const slug = `demo-${slugify(d.name)}`;
-    if (await Product.exists({ slug })) continue;
+    const existing = await Product.findOne({ slug }).select("images").lean();
+    if (existing) {
+      if (!existing.images?.length) {
+        await Product.updateOne({ _id: existing._id }, { $set: { images: [await demoImage(i, d.name)] } });
+        illustrated++;
+      }
+      continue;
+    }
     const sku = `DEMO-${String(i + 1).padStart(3, "0")}`;
     const p = await Product.create({
       name: d.name,
@@ -155,6 +214,7 @@ async function main() {
       description: `DEMO PRODUCT — sample listing for testing the store. Replace with real products before launch.\n\n${d.name} for everyday use.`,
       categoryId: catIds.get(d.cat),
       brand: "Demo",
+      images: [await demoImage(i, d.name)],
       price: d.price * 100,
       originalPrice: d.mrp ? d.mrp * 100 : undefined,
       tax: { gstRate: d.gst ?? 18, inclusive: true },
@@ -181,7 +241,7 @@ async function main() {
     if (logs.length) await InventoryLog.insertMany(logs);
     created++;
   }
-  console.log(`✔ ${created} demo product(s) created (${DEMO.length - created} already existed)`);
+  console.log(`✔ ${created} demo product(s) created with images (${DEMO.length - created} already existed${illustrated ? `, ${illustrated} given images` : ""})`);
 }
 
 main()

@@ -449,7 +449,7 @@ export function CheckoutForm({ profile, codEnabled, whatsappTransactionalAvailab
                   <Lock /> Confirm &amp; place order · {quote ? formatINR(quote.total) : ""}
                 </Button>
               </div>
-              <p className="text-center text-xs text-subtle-foreground">By placing this order you agree to the store&apos;s delivery and return policies.</p>
+              <p className="text-center text-xs text-subtle-foreground">After you place the order, WhatsApp opens so you can send it to the store. By placing this order you agree to the store&apos;s delivery and return policies.</p>
             </motion.div>
           )}
         </AnimatePresence>

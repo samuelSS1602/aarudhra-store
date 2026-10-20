@@ -13,16 +13,41 @@ const TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
 type Uploading = { id: string; name: string; progress: number };
 
+/**
+ * Phone camera photos are often 5–10 MB. Shrink big images in the browser before
+ * uploading so they always fit the limit and upload quickly on mobile data.
+ */
+async function shrinkForUpload(file: File): Promise<File> {
+  if (file.size <= 1.5 * 1024 * 1024 || typeof createImageBitmap !== "function") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.86));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/.w+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file; // undecodable here; let the server validate it
+  }
+}
+
 export function ImageUploader({
   value,
   onChange,
   max = 10,
   folder = "products",
+  withAlt = true,
 }: {
   value: ImageDTO[];
   onChange: (images: ImageDTO[]) => void;
   max?: number;
   folder?: "products" | "categories" | "banners" | "branding";
+  /** Show the per-image alt-text box (product form fills alt from the product name instead). */
+  withAlt?: boolean;
 }) {
   const [uploading, setUploading] = React.useState<Uploading[]>([]);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -33,12 +58,13 @@ export function ImageUploader({
     if (!files) return;
     const room = max - latest.current.length - uploading.length;
     const list = Array.from(files).slice(0, Math.max(0, room));
-    for (const file of list) {
+    for (const original of list) {
       // Client-side checks for fast feedback; the server re-validates by magic bytes.
-      if (!TYPES.includes(file.type)) {
-        toast.error(`${file.name}: only JPEG, PNG, WebP or AVIF images are allowed`);
+      if (!TYPES.includes(original.type)) {
+        toast.error(`${original.name}: only JPEG, PNG, WebP or AVIF photos are allowed`);
         continue;
       }
+      const file = await shrinkForUpload(original);
       if (file.size > MAX_BYTES) {
         toast.error(`${file.name}: images must be 4 MB or smaller`);
         continue;
@@ -86,13 +112,13 @@ export function ImageUploader({
                 <button type="button" onClick={() => onChange(value.filter((_, k) => k !== i))} className="rounded bg-white/90 p-1 text-danger" aria-label="Remove image"><Trash2 className="size-3.5" /></button>
               </div>
             </div>
-            <input
+            {withAlt && <input
               value={img.alt ?? ""}
               onChange={(e) => onChange(value.map((x, k) => (k === i ? { ...x, alt: e.target.value.slice(0, 200) } : x)))}
               placeholder="Alt text (describe the image)"
               aria-label={`Alt text for image ${i + 1}`}
               className="w-full border-t border-border px-2.5 py-2 text-base sm:text-xs focus-visible:outline-none"
-            />
+            />}
           </div>
         ))}
         {uploading.map((u) => (
@@ -116,8 +142,8 @@ export function ImageUploader({
             className={cn("flex aspect-square flex-col items-center justify-center gap-1.5 rounded-[var(--radius-lg)] border-2 border-dashed border-border-strong text-muted-foreground transition-colors hover:border-primary hover:bg-primary-soft/40 hover:text-primary")}
           >
             <ImagePlus className="size-6" />
-            <span className="text-xs font-semibold">Add image</span>
-            <span className="text-[10px]">JPEG/PNG/WebP · max 4 MB</span>
+            <span className="text-xs font-semibold">{value.length ? "Add more" : "Add photo"}</span>
+            <span className="text-[10px]">Tap to choose or take a photo</span>
           </button>
         )}
       </div>

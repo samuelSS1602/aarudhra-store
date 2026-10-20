@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "seed": "tsx --conditions=react-server scripts/seed.ts",
     "admin:create": "tsx --conditions=react-server scripts/create-admin.ts",
-    "db:indexes": "tsx --conditions=react-server scripts/sync-indexes.ts"
+    "db:indexes": "tsx --conditions=react-server scripts/sync-indexes.ts",
+    "photos:build": "tsx scripts/build-store-photos.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -10,7 +10,7 @@ import { formatPhoneForDisplay } from "@/lib/phone";
 export type OrderForMessage = {
   orderNumber: string;
   customerSnapshot: { name: string; phone: string };
-  items: { name: string; variantName?: string | null; quantity: number; lineTotal: number }[];
+  items: { name: string; variantName?: string | null; quantity: number; lineTotal: number; slug?: string | null; image?: string | null }[];
   subtotal: number;
   discount: number;
   deliveryCharge: number;
@@ -71,9 +71,18 @@ export function ownerTemplateParams(order: OrderForMessage, adminUrl: string): s
   ];
 }
 
-/** Full formatted owner message (used in "text" mode, inside the 24h service window). */
-export function ownerTextMessage(order: OrderForMessage, adminUrl: string): string {
+/**
+ * Full formatted owner message (Cloud API "text" mode and the customer's wa.me hand-off).
+ * With `siteUrl`, each item gets a link to its product page, so WhatsApp shows the
+ * product photo as a link preview.
+ */
+export function ownerTextMessage(order: OrderForMessage, adminUrl: string, siteUrl?: string): string {
   const a = order.shippingAddress;
+  const lines = itemSummaryLines(order);
+  const items = order.items.flatMap((i, k) => {
+    const link = siteUrl && i.slug ? new URL(`/products/${i.slug}`, siteUrl).toString() : "";
+    return [`• ${lines[k]}`, ...(link ? [`   📷 ${link}`] : [])];
+  });
   return [
     "🛍️ *NEW ORDER — AARUDHRA SMART STORE*",
     "",
@@ -84,7 +93,7 @@ export function ownerTextMessage(order: OrderForMessage, adminUrl: string): stri
     `Phone: ${formatPhoneForDisplay(order.customerSnapshot.phone)}`,
     "",
     "Items:",
-    ...itemSummaryLines(order).map((l) => `• ${l}`),
+    ...items,
     "",
     `Subtotal: ₹${formatAmount(order.subtotal)}`,
     "",

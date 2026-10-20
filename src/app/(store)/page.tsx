@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, MapPin, MessageCircle, Navigation } from "lucide-react";
+import { ArrowRight, MessageCircle, Navigation } from "lucide-react";
 import { getSettings, storeAddressLines } from "@/services/settings.service";
 import { listActiveCategoriesCached } from "@/services/categories.service";
 import { getProductCollectionsCached } from "@/services/products.service";
@@ -10,6 +10,9 @@ import { DynamicIcon } from "@/components/storefront/icons";
 import { ProductRail, SectionHeading } from "@/components/storefront/sections";
 import { Reveal } from "@/components/storefront/reveal";
 import { NewsletterForm } from "@/components/storefront/newsletter-form";
+import { HeroShowcase } from "@/components/storefront/hero-showcase";
+import { StoreGallery } from "@/components/storefront/store-gallery";
+import { STOREFRONT_PHOTO } from "@/components/storefront/store-photos";
 
 // Pre-built and served from cache; rebuilt on any catalogue/settings change (see lib/cache.ts).
 export const revalidate = 300;
@@ -33,72 +36,20 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_60%_at_85%_10%,var(--primary-soft)_0%,transparent_70%),radial-gradient(40%_50%_at_5%_90%,var(--accent-soft)_0%,transparent_70%)]" />
-        <div className="container-page grid items-center gap-10 py-7 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:py-20">
-          <Reveal>
-            {h.hero.eyebrow && (
-              <p className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-surface/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                <span className="size-1.5 rounded-full bg-accent" /> {h.hero.eyebrow}
-              </p>
-            )}
-            <h1 className="mt-4 max-w-xl font-display text-[2.15rem] font-semibold leading-[1.08] text-foreground sm:mt-5 sm:text-6xl">{h.hero.title}</h1>
-            {h.hero.subtitle && <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted-foreground sm:mt-5 sm:text-[17px]">{h.hero.subtitle}</p>}
-            <div className="mt-6 grid grid-cols-2 gap-2.5 sm:mt-8 sm:flex sm:flex-wrap sm:gap-3">
-              {h.hero.ctaLabel && (
-                <Button size="lg" asChild>
-                  <Link href={h.hero.ctaHref || "/products"}>
-                    {h.hero.ctaLabel} <ArrowRight />
-                  </Link>
-                </Button>
-              )}
-              {h.hero.secondaryCtaLabel && (
-                <Button size="lg" variant="outline" asChild>
-                  <Link href={h.hero.secondaryCtaHref || "/categories"}>{h.hero.secondaryCtaLabel}</Link>
-                </Button>
-              )}
-            </div>
-            <p className="mt-5 flex items-center gap-2 text-[13px] text-muted-foreground sm:mt-6 sm:text-sm">
-              <MapPin className="size-4 text-primary" /> {settings.general.address.line2}, {settings.general.address.city}
-            </p>
-          </Reveal>
-
-          <Reveal delay={0.1} className="relative hidden sm:block">
-            {h.hero.imageUrl ? (
-              <div className="relative aspect-[5/4] overflow-hidden rounded-[2rem] shadow-lift">
-                <Image src={h.hero.imageUrl} alt={settings.general.storeName} fill priority sizes="(min-width: 1024px) 45vw, 100vw" className="object-cover" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {featuredCats.slice(0, 4).map((c, i) => (
-                  <Link
-                    key={c.id}
-                    href={`/categories/${c.slug}`}
-                    className={cn(
-                      "group relative flex aspect-square flex-col justify-between overflow-hidden rounded-[1.75rem] p-5 transition-transform hover:-translate-y-1",
-                      ["bg-primary text-white", "bg-accent-soft text-accent-foreground", "bg-surface text-foreground shadow-soft border border-border", "bg-brand-gradient text-white"][i],
-                      i % 2 === 1 && "translate-y-6",
-                    )}
-                  >
-                    <DynamicIcon name={c.icon} className="size-9 opacity-90" />
-                    <div>
-                      <p className="font-display text-lg font-semibold leading-tight sm:text-xl">{c.name}</p>
-                      <p className="mt-1 flex items-center gap-1 text-xs font-medium opacity-75">
-                        Shop now <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </Reveal>
-        </div>
-      </section>
+      <HeroShowcase
+        eyebrow={h.hero.eyebrow}
+        title={h.hero.title}
+        subtitle={h.hero.subtitle}
+        cta={h.hero.ctaLabel ? { label: h.hero.ctaLabel, href: h.hero.ctaHref } : undefined}
+        secondary={h.hero.secondaryCtaLabel ? { label: h.hero.secondaryCtaLabel, href: h.hero.secondaryCtaHref } : undefined}
+        location={[settings.general.address.line2, settings.general.address.city].filter(Boolean).join(", ")}
+        codEnabled={settings.commerce.codEnabled}
+        adminImage={h.hero.imageUrl || null}
+      />
 
       {/* Categories */}
       {featuredCats.length > 0 && (
-        <section className="container-page mt-2 sm:mt-8" aria-labelledby="cat-heading">
+        <section className="container-page mt-8 sm:mt-14" aria-labelledby="cat-heading">
           <Reveal>
             <SectionHeading eyebrow="Browse" title="Shop by category" href="/categories" />
           </Reveal>
@@ -180,10 +131,30 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* Inside our store */}
+      <section className="mt-20" aria-labelledby="inside-heading">
+        <Reveal className="container-page">
+          <SectionHeading eyebrow="Inside our store" title="Come see it all in person" />
+        </Reveal>
+        <StoreGallery />
+      </section>
+
       {/* Store location */}
       <section className="container-page mt-20" aria-labelledby="visit-heading">
         <div className="grid overflow-hidden rounded-[2rem] border border-border bg-surface shadow-soft lg:grid-cols-2">
           <div className="p-6 sm:p-10">
+            {STOREFRONT_PHOTO && (
+              <div className="group relative mb-6 aspect-[16/9] overflow-hidden rounded-2xl shadow-soft">
+                <Image
+                  src={STOREFRONT_PHOTO.src}
+                  alt={STOREFRONT_PHOTO.caption}
+                  fill
+                  placeholder="blur"
+                  sizes="(min-width: 1024px) 40vw, 100vw"
+                  className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105"
+                />
+              </div>
+            )}
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Visit us</p>
             <h2 id="visit-heading" className="mt-2 font-display text-2xl font-semibold sm:text-3xl">Our Palani store</h2>
             <address className="mt-5 space-y-1 text-[15px] not-italic leading-relaxed text-muted-foreground">

@@ -5,6 +5,7 @@ import { createOrder } from "@/services/orders.service";
 import { handleWhatsAppWebhook, notifyNewOrder, processDueNotifications, retryNotification } from "@/services/notifications.service";
 import { NotificationLog } from "@/models/NotificationLog";
 import { Order } from "@/models/Order";
+import { ownerTextMessage } from "@/lib/whatsapp/templates";
 import { GET as webhookVerify, POST as webhookPost } from "@/app/api/webhooks/whatsapp/route";
 import { GET as cronRoute } from "@/app/api/cron/notifications/route";
 import { checkoutInput, makeAdmin, makeCustomer, makeProduct, request } from "./helpers";
@@ -160,5 +161,36 @@ describe("WhatsApp webhooks", () => {
 
     await handleWhatsAppWebhook(JSON.parse(statusPayload("wamid.DLV", "read")));
     expect((await NotificationLog.findOne({ providerMessageId: "wamid.DLV" }).lean())?.status).toBe("read");
+  });
+});
+
+describe("owner WhatsApp order message", () => {
+  const order = {
+    orderNumber: "AAS-1",
+    customerSnapshot: { name: "Test", phone: "+919876500001" },
+    items: [
+      { name: "Notebook", quantity: 2, lineTotal: 10000, slug: "notebook" },
+      { name: "Pen", quantity: 1, lineTotal: 1000 },
+    ],
+    subtotal: 11000,
+    discount: 0,
+    deliveryCharge: 0,
+    tax: 0,
+    totalAmount: 11000,
+    paymentMethod: "cod",
+    paymentStatus: "pending",
+    shippingAddress: { fullName: "Test", phone: "+919876500001", line1: "1 Main St", city: "Palani", district: "Dindigul", state: "Tamil Nadu", pincode: "624601" },
+    createdAt: new Date(),
+  };
+
+  it("links each product page so WhatsApp previews its photo", () => {
+    const msg = ownerTextMessage(order, "https://shop.example/admin/orders/1", "https://shop.example");
+    expect(msg).toContain("• 2 × Notebook");
+    expect(msg).toContain("📷 https://shop.example/products/notebook");
+    expect(msg.match(/📷/g)).toHaveLength(1); // items without a slug get no link
+  });
+
+  it("omits product links when no public site URL is given", () => {
+    expect(ownerTextMessage(order, "http://localhost:3000/admin/orders/1")).not.toContain("📷");
   });
 });

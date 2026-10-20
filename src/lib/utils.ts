@@ -70,6 +70,11 @@ export function maskPhone(phone: string | null | undefined): string {
 }
 
 /** wa.me links need digits only. */
+/** JPEG URL for a stored photo. WhatsApp previews and image messages accept only JPEG/PNG. */
+export function jpegImageUrl(url: string): string {
+  return url.replace(/^(.*\/media\/[a-f0-9]{24})\.webp$/i, "$1.jpg");
+}
+
 export function whatsappLink(phone: string, text?: string): string {
   const digits = phone.replace(/\D/g, "");
   return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ""}`;

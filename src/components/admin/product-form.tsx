@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm, Controller } from "react-hook-form";
-import { Archive, Boxes, Plus, Save, Trash2 } from "lucide-react";
+import { Archive, Boxes, ChevronDown, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/client-api";
 import { GST_RATES } from "@/lib/constants";
@@ -50,6 +50,13 @@ type Values = {
 
 const r = (paise: number | null | undefined) => (paise === null || paise === undefined ? "" : String(toRupees(paise)));
 const num = (s: string | undefined) => (s === undefined || String(s).trim() === "" ? undefined : Number(s));
+
+/** Short readable SKU from the name, e.g. "Classmate Notebook" → "CLAS-NOTE-4K7Q". */
+const autoSku = (name: string) => {
+  const words = slugify(name).split("-").filter(Boolean).slice(0, 2).map((w) => w.slice(0, 4).toUpperCase());
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return [...(words.length ? words : ["ITEM"]), rand].join("-");
+};
 
 /** "Colour: Blue; Size: A4" ⇄ [{name, value}] */
 const parseOptions = (s: string) =>
@@ -131,14 +138,16 @@ export function ProductForm({
   const onSubmit = handleSubmit(async (v) => {
     setServerError(null);
     setSaving(true);
+    const sku = v.sku.trim() || autoSku(v.name);
+    if (!v.sku.trim()) setValue("sku", sku);
     const payload = {
       name: v.name,
       slug: v.slug,
-      sku: v.sku,
+      sku,
       description: v.description,
       categoryId: v.categoryId,
       brand: v.brand,
-      images: v.images,
+      images: v.images.map((img) => ({ ...img, alt: img.alt || v.name })),
       price: num(v.price) ?? 0,
       originalPrice: num(v.originalPrice),
       ...(canSeeCost ? { costPrice: num(v.costPrice) } : {}),
@@ -153,10 +162,10 @@ export function ProductForm({
       seo: { title: v.seoTitle, description: v.seoDescription },
       tags: v.tags.split(",").map((t) => t.trim()).filter(Boolean),
       specifications: v.specifications.filter((s) => s.label && s.value),
-      variants: v.variants.map((x) => ({
+      variants: v.variants.map((x, i) => ({
         _id: x._id,
         name: x.name,
-        sku: x.sku,
+        sku: x.sku.trim() || `${sku}-V${i + 1}`,
         options: parseOptions(x.optionsText),
         price: num(x.price),
         originalPrice: num(x.originalPrice),
@@ -210,101 +219,146 @@ export function ProductForm({
   }
 
   const hasVariants = watch("variants").length > 0;
+  const images = watch("images");
 
   return (
-    <form onSubmit={onSubmit} noValidate className="grid gap-5 pb-20 md:pb-0 xl:grid-cols-[1fr_340px]">
+    <form onSubmit={onSubmit} noValidate className="mx-auto max-w-3xl space-y-5 pb-24 md:pb-0">
       <div className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 px-4 py-3 shadow-[0_-8px_24px_-12px_rgb(22_27_51/0.25)] backdrop-blur-md md:hidden">
         <Button type="submit" className="w-full" size="lg" loading={saving}>
-          <Save /> {editing ? "Save changes" : "Create product"}
+          <Save /> {editing ? "Save changes" : "Add product"}
         </Button>
       </div>
-      <div className="space-y-5">
-        {serverError && <Alert tone="danger">{serverError}</Alert>}
-        <Card>
-          <CardHeader><CardTitle>Basic details</CardTitle></CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field id="name" label="Product name" error={err("name")} className="sm:col-span-2">
-              <Input
-                id="name"
-                aria-invalid={Boolean(err("name")) || undefined}
-                {...register("name", {
-                  required: "Product name is required",
-                  onChange: (e) => !slugTouched.current && setValue("slug", slugify(e.target.value)),
-                })}
-              />
+      {serverError && <Alert tone="danger">{serverError}</Alert>}
+
+      {/* Step 1: photos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Photos</CardTitle>
+          <p className="text-sm text-muted-foreground">The first photo is shown in the shop. On a phone you can take photos with the camera.</p>
+        </CardHeader>
+        <CardContent>
+          <Controller control={control} name="images" render={({ field }) => <ImageUploader value={field.value} onChange={field.onChange} withAlt={false} />} />
+          {images.length === 0 && <p className="mt-3 text-xs text-muted-foreground">Tip: products with a photo sell much better.</p>}
+        </CardContent>
+      </Card>
+
+      {/* Step 2: the essentials */}
+      <Card>
+        <CardHeader><CardTitle>Product details</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <Field id="name" label="Product name" error={err("name")} className="sm:col-span-2">
+            <Input
+              id="name"
+              placeholder="e.g. Classmate Long Notebook 200 pages"
+              aria-invalid={Boolean(err("name")) || undefined}
+              {...register("name", {
+                required: "Product name is required",
+                onChange: (e) => !slugTouched.current && setValue("slug", slugify(e.target.value)),
+              })}
+            />
+          </Field>
+          <Field id="price" label="Selling price (₹)" error={err("price")}>
+            <Input id="price" type="number" step="0.01" min="0" inputMode="decimal" placeholder="0" {...register("price", { required: "Price is required" })} />
+          </Field>
+          <Field id="originalPrice" label="MRP (₹), optional" error={err("originalPrice")} hint="If higher than the price, a discount is shown">
+            <Input id="originalPrice" type="number" step="0.01" min="0" inputMode="decimal" {...register("originalPrice")} />
+          </Field>
+          <Field id="categoryId" label="Category" error={err("categoryId")}>
+            <NativeSelect id="categoryId" {...register("categoryId", { required: "Choose a category" })}>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}{c.status === "inactive" ? " (inactive)" : ""}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+          {!hasVariants ? (
+            <Field id="stock" label={editing ? "Stock in hand" : "How many in stock?"} error={err("stock")} hint={editing ? "Change stock from Inventory so it's logged" : undefined}>
+              <Input id="stock" type="number" min="0" inputMode="numeric" disabled={editing} {...register("stock")} />
             </Field>
-            <Field id="slug" label="URL slug" error={err("slug")} hint="Used in the product URL">
-              <Input id="slug" {...register("slug", { onChange: () => (slugTouched.current = true) })} />
+          ) : (
+            <p className="self-end pb-2.5 text-sm text-muted-foreground">Stock is tracked per variant (see More options).</p>
+          )}
+          <Field id="description" label="Description, optional" error={err("description")} className="sm:col-span-2">
+            <Textarea id="description" rows={4} placeholder="Size, colour, material, pack quantity…" {...register("description")} />
+          </Field>
+          <div className="grid gap-3 rounded-[var(--radius-lg)] bg-surface-muted/60 p-3.5 sm:col-span-2 sm:grid-cols-2">
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span><span className="font-medium">Show in shop</span><span className="block text-xs text-muted-foreground">Off = saved as a hidden draft</span></span>
+              <Switch checked={watch("status") === "active"} onCheckedChange={(c) => setValue("status", c ? "active" : "draft")} />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span><span className="font-medium">Featured</span><span className="block text-xs text-muted-foreground">Show on the homepage</span></span>
+              <Switch checked={watch("featured")} onCheckedChange={(c) => setValue("featured", c)} />
+            </label>
+          </div>
+          <div className="hidden sm:col-span-2 md:block">
+            <Button type="submit" size="lg" loading={saving}><Save /> {editing ? "Save changes" : "Add product"}</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Everything else, collapsed */}
+      <details className="group rounded-[var(--radius-xl)] border border-border bg-surface shadow-soft" open={Boolean(errs.sku || errs.slug || errs.gstRate || errs.variants) || undefined}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="font-semibold">More options</span>
+            <span className="block text-xs text-muted-foreground">SKU, brand, GST, variants, specifications, SEO, shipping. All optional.</span>
+          </span>
+          <ChevronDown className="size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="space-y-7 border-t border-border p-5">
+          <section className="grid gap-4 sm:grid-cols-2">
+            <Field id="sku" label="SKU" error={err("sku")} hint="Leave empty to create one automatically">
+              <Input id="sku" className="uppercase" {...register("sku")} />
             </Field>
-            <Field id="sku" label="SKU" error={err("sku")}>
-              <Input id="sku" className="uppercase" {...register("sku", { required: "SKU is required" })} />
-            </Field>
-            <Field id="categoryId" label="Category" error={err("categoryId")}>
-              <NativeSelect id="categoryId" {...register("categoryId", { required: "Choose a category" })}>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}{c.status === "inactive" ? " (inactive)" : ""}</option>
-                ))}
-              </NativeSelect>
-            </Field>
-            <Field id="brand" label="Brand (optional)" error={err("brand")}>
+            <Field id="brand" label="Brand" error={err("brand")}>
               <Input id="brand" {...register("brand")} />
             </Field>
-            <Field id="description" label="Description" error={err("description")} className="sm:col-span-2">
-              <Textarea id="description" rows={6} {...register("description")} />
+            <Field id="slug" label="URL slug" error={err("slug")} hint="Filled in from the name">
+              <Input id="slug" {...register("slug", { onChange: () => (slugTouched.current = true) })} />
             </Field>
-            <Field id="tags" label="Search tags" hint="Comma separated, e.g. school, ruled, A4" className="sm:col-span-2">
+            <Field id="tags" label="Search tags" hint="Comma separated, e.g. school, ruled, A4">
               <Input id="tags" {...register("tags")} />
             </Field>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Images</CardTitle></CardHeader>
-          <CardContent>
-            <Controller control={control} name="images" render={({ field }) => <ImageUploader value={field.value} onChange={field.onChange} />} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Pricing &amp; tax</CardTitle></CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
-            <Field id="price" label="Selling price (₹)" error={err("price")}>
-              <Input id="price" type="number" step="0.01" min="0" inputMode="decimal" {...register("price", { required: "Price is required" })} />
-            </Field>
-            <Field id="originalPrice" label="Original / MRP (₹)" error={err("originalPrice")} hint="Shows a strike-through discount">
-              <Input id="originalPrice" type="number" step="0.01" min="0" inputMode="decimal" {...register("originalPrice")} />
-            </Field>
-            {canSeeCost && (
-              <Field id="costPrice" label="Cost price (₹)" error={err("costPrice")} hint="Private — never shown to customers">
-                <Input id="costPrice" type="number" step="0.01" min="0" inputMode="decimal" {...register("costPrice")} />
-              </Field>
-            )}
-            <Field id="gstRate" label="GST rate" error={err("gstRate")}>
-              <NativeSelect id="gstRate" {...register("gstRate")}>
-                {GST_RATES.map((g) => <option key={g} value={g}>{g}%</option>)}
+            <Field id="statusSelect" label="Visibility">
+              <NativeSelect id="statusSelect" {...register("status")}>
+                <option value="active">Active (visible in store)</option>
+                <option value="draft">Draft (hidden)</option>
+                <option value="archived">Archived (hidden)</option>
               </NativeSelect>
             </Field>
-            <Field id="hsnCode" label="HSN code (optional)">
-              <Input id="hsnCode" {...register("hsnCode")} />
-            </Field>
-            <div className="flex items-end pb-2.5">
-              <label className="flex items-center gap-2.5 text-sm">
+          </section>
+
+          <section>
+            <h3 className="mb-3 text-sm font-semibold">Tax &amp; cost</h3>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field id="gstRate" label="GST rate" error={err("gstRate")}>
+                <NativeSelect id="gstRate" {...register("gstRate")}>
+                  {GST_RATES.map((g) => <option key={g} value={g}>{g}%</option>)}
+                </NativeSelect>
+              </Field>
+              <Field id="hsnCode" label="HSN code">
+                <Input id="hsnCode" {...register("hsnCode")} />
+              </Field>
+              {canSeeCost && (
+                <Field id="costPrice" label="Cost price (₹)" error={err("costPrice")} hint="Private, never shown to customers">
+                  <Input id="costPrice" type="number" step="0.01" min="0" inputMode="decimal" {...register("costPrice")} />
+                </Field>
+              )}
+              <label className="flex items-center gap-2.5 text-sm sm:col-span-3">
                 <Switch checked={watch("taxInclusive")} onCheckedChange={(c) => setValue("taxInclusive", c)} /> Price includes GST
               </label>
             </div>
-          </CardContent>
-        </Card>
+          </section>
 
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Variants</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={() => variants.append({ name: "", sku: "", optionsText: "", price: "", originalPrice: "", stock: "0", status: "active" })}>
-              <Plus /> Add variant
-            </Button>
-          </CardHeader>
-          <CardContent>
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Variants</h3>
+              <Button type="button" variant="outline" size="sm" onClick={() => variants.append({ name: "", sku: "", optionsText: "", price: "", originalPrice: "", stock: "0", status: "active" })}>
+                <Plus /> Add variant
+              </Button>
+            </div>
             {variants.fields.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No variants. Add variants for sizes, colours or pack options — each has its own SKU and stock.</p>
+              <p className="text-sm text-muted-foreground">For sizes, colours or pack options. Each has its own stock.</p>
             ) : (
               <div className="space-y-3">
                 {variants.fields.map((f, i) => {
@@ -316,7 +370,7 @@ export function ProductForm({
                         <Input id={`v${i}name`} placeholder="Blue / A4" {...register(`variants.${i}.name`, { required: "Required" })} />
                       </Field>
                       <Field id={`v${i}sku`} label="SKU" error={ve.sku?.message} className="sm:col-span-2">
-                        <Input id={`v${i}sku`} className="uppercase" {...register(`variants.${i}.sku`, { required: "Required" })} />
+                        <Input id={`v${i}sku`} className="uppercase" placeholder="Auto" {...register(`variants.${i}.sku`)} />
                       </Field>
                       <Field id={`v${i}opts`} label="Options" hint="Colour: Blue; Size: A4" className="sm:col-span-2">
                         <Input id={`v${i}opts`} {...register(`variants.${i}.optionsText`)} />
@@ -338,105 +392,69 @@ export function ProductForm({
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </section>
 
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Specifications</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={() => specs.append({ label: "", value: "" })}><Plus /> Add</Button>
-          </CardHeader>
-          <CardContent className="space-y-2">
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Specifications</h3>
+              <Button type="button" variant="outline" size="sm" onClick={() => specs.append({ label: "", value: "" })}><Plus /> Add</Button>
+            </div>
             {specs.fields.length === 0 && <p className="text-sm text-muted-foreground">e.g. Pages: 200 · Ruling: Single line · Material: Steel</p>}
-            {specs.fields.map((f, i) => (
-              <div key={f.id} className="flex gap-2">
-                <Input aria-label="Specification label" placeholder="Label" {...register(`specifications.${i}.label`)} />
-                <Input aria-label="Specification value" placeholder="Value" {...register(`specifications.${i}.value`)} />
-                <Button type="button" variant="ghost" size="icon" onClick={() => specs.remove(i)} aria-label="Remove"><Trash2 /></Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              {specs.fields.map((f, i) => (
+                <div key={f.id} className="flex gap-2">
+                  <Input aria-label="Specification label" placeholder="Label" {...register(`specifications.${i}.label`)} />
+                  <Input aria-label="Specification value" placeholder="Value" {...register(`specifications.${i}.value`)} />
+                  <Button type="button" variant="ghost" size="icon" onClick={() => specs.remove(i)} aria-label="Remove"><Trash2 /></Button>
+                </div>
+              ))}
+            </div>
+          </section>
 
-        <Card>
-          <CardHeader><CardTitle>Search engine listing</CardTitle></CardHeader>
-          <CardContent className="grid gap-4">
+          <section className="grid gap-4 sm:grid-cols-2">
+            <h3 className="text-sm font-semibold sm:col-span-2">Stock alert, barcode &amp; shipping</h3>
+            <Field id="lowStockThreshold" label="Low-stock alert at" error={err("lowStockThreshold")}>
+              <Input id="lowStockThreshold" type="number" min="0" {...register("lowStockThreshold")} />
+            </Field>
+            <Field id="barcode" label="Barcode">
+              <Input id="barcode" {...register("barcode")} />
+            </Field>
+            <Field id="weightGrams" label="Weight (g)"><Input id="weightGrams" type="number" min="0" {...register("weightGrams")} /></Field>
+            <div className="grid grid-cols-3 gap-2">
+              <Field id="lengthCm" label="L (cm)"><Input id="lengthCm" type="number" min="0" {...register("lengthCm")} /></Field>
+              <Field id="widthCm" label="W (cm)"><Input id="widthCm" type="number" min="0" {...register("widthCm")} /></Field>
+              <Field id="heightCm" label="H (cm)"><Input id="heightCm" type="number" min="0" {...register("heightCm")} /></Field>
+            </div>
+          </section>
+
+          <section className="grid gap-4">
+            <h3 className="text-sm font-semibold">Search engine listing</h3>
             <Field id="seoTitle" label="SEO title" error={err("seoTitle")} hint={`${watch("seoTitle").length}/70`}>
               <Input id="seoTitle" maxLength={70} {...register("seoTitle")} />
             </Field>
             <Field id="seoDescription" label="SEO description" error={err("seoDescription")} hint={`${watch("seoDescription").length}/170`}>
               <Textarea id="seoDescription" rows={2} maxLength={170} {...register("seoDescription")} />
             </Field>
-          </CardContent>
-        </Card>
-      </div>
+          </section>
+        </div>
+      </details>
 
-      <div className="space-y-5 xl:sticky xl:top-20 xl:self-start">
+      {editing && (
         <Card>
-          <CardHeader><CardTitle>Status</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <Field id="status" label="Visibility">
-              <NativeSelect id="status" {...register("status")}>
-                <option value="active">Active — visible in store</option>
-                <option value="draft">Draft — hidden</option>
-                <option value="archived">Archived — hidden</option>
-              </NativeSelect>
-            </Field>
-            <label className="flex items-center justify-between text-sm">
-              <span><span className="font-medium">Featured</span><span className="block text-xs text-muted-foreground">Show on the homepage</span></span>
-              <Switch checked={watch("featured")} onCheckedChange={(c) => setValue("featured", c)} />
-            </label>
-            <Button type="submit" className="w-full" loading={saving}><Save /> {editing ? "Save changes" : "Create product"}</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Inventory</CardTitle></CardHeader>
-          <CardContent className="grid gap-4">
-            {!hasVariants && (
-              <Field id="stock" label={editing ? "Stock on hand" : "Initial stock"} error={err("stock")} hint={editing ? "Change stock from Inventory so it's logged" : undefined}>
-                <Input id="stock" type="number" min="0" disabled={editing} {...register("stock")} />
-              </Field>
+          <CardContent className="flex flex-wrap gap-2 pt-5 sm:pt-6">
+            {product!.status === "archived" ? (
+              <Button type="button" variant="outline" onClick={() => setStatus("active")}>Restore product</Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setStatus("archived")}><Archive /> Archive</Button>
             )}
-            {hasVariants && <p className="text-sm text-muted-foreground">Stock is tracked per variant.</p>}
-            <Field id="lowStockThreshold" label="Low-stock alert at" error={err("lowStockThreshold")}>
-              <Input id="lowStockThreshold" type="number" min="0" {...register("lowStockThreshold")} />
-            </Field>
-            <Field id="barcode" label="Barcode (optional)">
-              <Input id="barcode" {...register("barcode")} />
-            </Field>
-            {editing && (
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/admin/inventory?productId=${product!.id}`}><Boxes /> Adjust stock / history</Link>
-              </Button>
-            )}
+            <Button asChild variant="outline">
+              <Link href={`/admin/inventory?productId=${product!.id}`}><Boxes /> Adjust stock / history</Link>
+            </Button>
+            {canDelete && <Button type="button" variant="danger-outline" onClick={del}><Trash2 /> Delete permanently</Button>}
+            <Label className="block w-full text-xs font-normal text-muted-foreground">Products that appear in orders can only be archived, not deleted.</Label>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Shipping</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3">
-            <Field id="weightGrams" label="Weight (g)" className="col-span-2"><Input id="weightGrams" type="number" min="0" {...register("weightGrams")} /></Field>
-            <Field id="lengthCm" label="Length (cm)"><Input id="lengthCm" type="number" min="0" {...register("lengthCm")} /></Field>
-            <Field id="widthCm" label="Width (cm)"><Input id="widthCm" type="number" min="0" {...register("widthCm")} /></Field>
-            <Field id="heightCm" label="Height (cm)"><Input id="heightCm" type="number" min="0" {...register("heightCm")} /></Field>
-          </CardContent>
-        </Card>
-
-        {editing && (
-          <Card>
-            <CardContent className="space-y-2 pt-5 sm:pt-6">
-              {product!.status === "archived" ? (
-                <Button type="button" variant="outline" className="w-full" onClick={() => setStatus("active")}>Restore product</Button>
-              ) : (
-                <Button type="button" variant="outline" className="w-full" onClick={() => setStatus("archived")}><Archive /> Archive</Button>
-              )}
-              {canDelete && <Button type="button" variant="danger-outline" className="w-full" onClick={del}><Trash2 /> Delete permanently</Button>}
-              <Label className="block text-xs font-normal text-muted-foreground">Products that appear in orders can only be archived, not deleted.</Label>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      )}
     </form>
   );
 }

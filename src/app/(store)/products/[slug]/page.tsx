@@ -4,7 +4,7 @@ import { RotateCcw, ShieldCheck, Store, Truck } from "lucide-react";
 import { getProductBySlug, getRelatedProducts } from "@/services/products.service";
 import { getSettings } from "@/services/settings.service";
 import { breadcrumbJsonLd, JsonLd, productJsonLd } from "@/lib/seo";
-import { formatINR } from "@/lib/utils";
+import { formatINR, jpegImageUrl } from "@/lib/utils";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ProductGallery } from "@/components/products/product-gallery";
 import { PurchasePanel } from "@/components/products/purchase-panel";
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: p.seo.title || p.name,
     description,
     alternates: { canonical: `/products/${p.slug}` },
-    openGraph: { type: "website", title: p.seo.title || p.name, description, images: p.images.map((i) => ({ url: i.url, alt: i.alt || p.name })) },
+    openGraph: { type: "website", title: p.seo.title || p.name, description, images: p.images.slice(0, 1).map((i) => ({ url: jpegImageUrl(i.url), alt: i.alt || p.name })) },
   };
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import sharp from "sharp";
 import { findImage, storeImage } from "@/lib/media-store";
 import { imageSchema } from "@/lib/validation/common";
+import { jpegImageUrl } from "@/lib/utils";
 import { productInputSchema } from "@/lib/validation/schemas";
 import { createProduct, deleteProduct, updateProduct } from "@/services/products.service";
 import { GET as mediaRoute } from "@/app/media/[file]/route";
@@ -39,6 +40,18 @@ describe("MongoDB image storage", () => {
     expect((await sharp(body).metadata()).format).toBe("webp");
     const again = await serve(file, { "if-none-match": res.headers.get("etag")! });
     expect(again.status).toBe(304);
+  });
+
+  it("serves a JPEG copy for WhatsApp at /media/<id>.jpg", async () => {
+    const img = await storeImage(await photo(), { folder: "products", uploadedBy: "test" });
+    const jpg = jpegImageUrl(img.url);
+    expect(jpg).toMatch(/^\/media\/[a-f0-9]{24}\.jpg$/);
+    const res = await serve(jpg.split("/").pop()!);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect((await sharp(new Uint8Array(await res.arrayBuffer())).metadata()).format).toBe("jpeg");
+    expect(res.headers.get("etag")).not.toBe((await serve(img.url.split("/").pop()!)).headers.get("etag"));
+    expect(jpegImageUrl("https://res.cloudinary.com/x/image/upload/a.png")).toBe("https://res.cloudinary.com/x/image/upload/a.png");
   });
 
   it("returns 404 for unknown or malformed image paths", async () => {
