@@ -51,7 +51,7 @@ export default async function ProductPage({ params }: Props) {
     <div className="container-page py-6 sm:py-8">
       <Breadcrumbs items={crumbs} />
       <div className="mt-5 grid gap-8 lg:grid-cols-2 lg:gap-14">
-        <ProductGallery images={product.images} name={product.name} discountPercent={product.discountPercent} />
+        <ProductGallery key={product.id} images={product.images} name={product.name} discountPercent={product.discountPercent} />
 
         <div>
           {product.brand && <p className="text-sm font-semibold uppercase tracking-wide text-primary">{product.brand}</p>}

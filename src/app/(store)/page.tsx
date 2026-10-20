@@ -12,6 +12,7 @@ import { Reveal } from "@/components/storefront/reveal";
 import { NewsletterForm } from "@/components/storefront/newsletter-form";
 import { HeroShowcase } from "@/components/storefront/hero-showcase";
 import { StoreGallery } from "@/components/storefront/store-gallery";
+import { BrandMarquee } from "@/components/storefront/brand-marquee";
 import { STOREFRONT_PHOTO } from "@/components/storefront/store-photos";
 
 // Pre-built and served from cache; rebuilt on any catalogue/settings change (see lib/cache.ts).
@@ -72,6 +73,8 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {h.brands.enabled && <BrandMarquee title={h.brands.title} brands={h.brands.items} />}
 
       <ProductRail eyebrow="Handpicked" title="Featured products" href="/products" products={collections.featured} />
 

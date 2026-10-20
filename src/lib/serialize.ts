@@ -60,6 +60,10 @@ export function toProductCardDTO(p: AnyDoc): ProductCardDTO {
     slug: p.slug,
     brand: p.brand ?? "",
     image: image(p.images?.[0]),
+    images: (p.images ?? [])
+      .filter((i: AnyDoc) => i?.url)
+      .slice(0, 6)
+      .map((i: AnyDoc) => ({ url: i.url, alt: i.alt ?? "" })),
     price: p.price,
     originalPrice: p.originalPrice ?? null,
     discountPercent: p.discountPercent ?? 0,

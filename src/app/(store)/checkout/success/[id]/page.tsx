@@ -32,8 +32,7 @@ export default async function OrderSuccessPage({ params }: { params: Promise<{ i
   const storeWa = wa || resolveOwnerRecipients(settings)[0] || "";
   const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const adminUrl = new URL(`/admin/orders/${order.id}`, siteUrl).toString();
-  // Product links (shown by WhatsApp as photo previews) only work on the public site.
-  const storeMessage = ownerTextMessage(doc as unknown as OrderForMessage, adminUrl, siteUrl.startsWith("https://") ? siteUrl : undefined);
+  const storeMessage = ownerTextMessage(doc as unknown as OrderForMessage, adminUrl, siteUrl);
 
   return (
     <div className="container-page max-w-4xl py-8 sm:py-12">

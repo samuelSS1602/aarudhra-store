@@ -31,6 +31,8 @@ export type ProductCardDTO = {
   slug: string;
   brand: string;
   image: ImageDTO | null;
+  /** Up to 6 photos for the card (url + alt). Optional: older cached entries lack it. */
+  images?: ImageDTO[];
   price: number;
   originalPrice: number | null;
   discountPercent: number;

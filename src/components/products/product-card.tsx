@@ -10,9 +10,21 @@ import type { ProductCardDTO } from "@/types";
 import { useCart } from "@/components/providers/cart-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { ProductImage } from "./product-image";
+import { CardPhotos } from "./card-photos";
 import { Price, StockLabel } from "./price";
 
-export function ProductCard({ product, layout = "grid", priority }: { product: ProductCardDTO; layout?: "grid" | "list"; priority?: boolean }) {
+export function ProductCard({
+  product,
+  layout = "grid",
+  priority,
+  photoSwipe = true,
+}: {
+  product: ProductCardDTO;
+  layout?: "grid" | "list";
+  priority?: boolean;
+  /** Let shoppers swipe between photos (off inside sideways-scrolling rails). */
+  photoSwipe?: boolean;
+}) {
   const { add } = useCart();
   const { wishlist, toggleWishlist } = useSession();
   const [added, setAdded] = React.useState(false);
@@ -103,7 +115,14 @@ export function ProductCard({ product, layout = "grid", priority }: { product: P
     >
       {wishlistButton}
       <Link href={href} className="relative block aspect-square overflow-hidden" tabIndex={-1} aria-hidden>
-        <ProductImage image={product.image} name={product.name} priority={priority} className="size-full transition-transform duration-500 group-hover:scale-[1.04]" />
+        <CardPhotos
+          images={product.images?.length ? product.images : product.image ? [product.image] : []}
+          name={product.name}
+          priority={priority}
+          swipe={photoSwipe}
+          raiseDots={outOfStock}
+          className="size-full"
+        />
         {product.discountPercent > 0 && (
           <span className="absolute left-2.5 top-2.5 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white shadow-soft">
             {product.discountPercent}% OFF

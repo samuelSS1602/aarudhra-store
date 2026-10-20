@@ -121,6 +121,11 @@ export const homepageSettingsSchema = z.object({
   featuredProductIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).max(24),
   highlights: z.array(z.object({ icon: t(40), title: t(60).min(1), text: t(200) })).max(8),
   newsletterEnabled: z.boolean(),
+  brands: z.object({
+    enabled: z.boolean(),
+    title: t(60),
+    items: z.array(z.object({ name: t(40).min(1, "Brand name is required"), logoUrl: imageUrl })).max(30),
+  }),
 });
 
 export const settingsSectionSchemas = {

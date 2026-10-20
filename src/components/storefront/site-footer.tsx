@@ -96,8 +96,8 @@ export function SiteFooter({ settings, categories }: { settings: StoreSettings; 
             <span aria-hidden className="hidden h-3 w-px bg-border-strong md:block" />
             <p>
               Developed by{" "}
-              <a href="https://codecrafters-pi.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-brand-gradient font-semibold hover:opacity-80">
-                Code Crafters
+              <a href="https://www.ruthradigitalsolutions.com/" target="_blank" rel="noopener noreferrer" className="text-brand-gradient font-semibold hover:opacity-80">
+                Ruthra Digital Solutions
               </a>
             </p>
           </div>

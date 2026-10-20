@@ -23,6 +23,8 @@ export type HomepageBanner = {
 
 export type StoreHighlight = { icon: string; title: string; text: string };
 
+export type StoreBrand = { name: string; logoUrl: string };
+
 export type StoreSettings = {
   general: {
     storeName: string;
@@ -91,6 +93,8 @@ export type StoreSettings = {
     featuredProductIds: string[];
     highlights: StoreHighlight[];
     newsletterEnabled: boolean;
+    /** Scrolling "Brands we stock" strip; a brand without a logo shows its name. */
+    brands: { enabled: boolean; title: string; items: StoreBrand[] };
   };
 };
 
@@ -209,5 +213,11 @@ export const DEFAULT_SETTINGS: StoreSettings = {
       { icon: "Store", title: "Visit our store", text: "Opposite Town Police Station, New Dharapuram Road." },
     ],
     newsletterEnabled: false,
+    // Brands seen on the shelves in the store photos; editable in Settings → Homepage.
+    brands: {
+      enabled: true,
+      title: "Brands we stock",
+      items: ["DOMS", "Classmate", "Pentonic", "Unomax", "Kidbizz", "Milton", "Pigeon", "Premier", "Hawkins", "Visalam"].map((name) => ({ name, logoUrl: "" })),
+    },
   },
 };

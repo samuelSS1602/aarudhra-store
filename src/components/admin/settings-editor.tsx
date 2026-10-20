@@ -290,7 +290,7 @@ export function SettingsEditor({
               <Field id="h-cta2" label="Second button label"><Input id="h-cta2" value={homepage.hero.secondaryCtaLabel} onChange={(e) => setH("hero", { ...homepage.hero, secondaryCtaLabel: e.target.value })} /></Field>
               <Field id="h-cta2-href" label="Second button link" error={err("hero.secondaryCtaHref")}><Input id="h-cta2-href" value={homepage.hero.secondaryCtaHref} onChange={(e) => setH("hero", { ...homepage.hero, secondaryCtaHref: e.target.value })} /></Field>
               <div className="sm:col-span-2">
-                <p className="mb-1.5 text-sm font-medium">Hero image (optional — otherwise category tiles are shown)</p>
+                <p className="mb-1.5 text-sm font-medium">Extra hero photo (optional, shown first in the store-photo slideshow)</p>
                 <ImageUploader max={1} folder="banners" value={homepage.hero.imageUrl ? [{ url: homepage.hero.imageUrl }] : []} onChange={(imgs) => setH("hero", { ...homepage.hero, imageUrl: imgs[0]?.url ?? "" })} />
               </div>
             </CardContent>
@@ -320,6 +320,35 @@ export function SettingsEditor({
                   </div>
                 );
               })}
+            </CardContent>
+          </Card>
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex-row items-center justify-between gap-3">
+              <div>
+                <CardTitle>Brands strip</CardTitle>
+                <CardDescription>Scrolling brand names on the homepage. Add a logo to show it instead of the name.</CardDescription>
+              </div>
+              <Switch aria-label="Show brands strip" checked={homepage.brands.enabled} onCheckedChange={(v) => setH("brands", { ...homepage.brands, enabled: v })} />
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <Field id="h-brands-title" label="Title"><Input id="h-brands-title" maxLength={60} value={homepage.brands.title} onChange={(e) => setH("brands", { ...homepage.brands, title: e.target.value })} /></Field>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {homepage.brands.items.map((b, i) => {
+                  const upd = (patch: Partial<typeof b>) => setH("brands", { ...homepage.brands, items: homepage.brands.items.map((x, k) => (k === i ? { ...x, ...patch } : x)) });
+                  return (
+                    <div key={i} className="grid gap-2 rounded-[var(--radius-lg)] border border-border p-3">
+                      <div className="flex gap-2">
+                        <Input aria-label={`Brand ${i + 1} name`} placeholder="Brand name" maxLength={40} value={b.name} onChange={(e) => upd({ name: e.target.value })} />
+                        <Button type="button" variant="ghost" size="icon" className="text-danger" aria-label="Remove brand" onClick={() => setH("brands", { ...homepage.brands, items: homepage.brands.items.filter((_, k) => k !== i) })}><Trash2 /></Button>
+                      </div>
+                      <ImageUploader max={1} folder="branding" withAlt={false} value={b.logoUrl ? [{ url: b.logoUrl }] : []} onChange={(imgs) => upd({ logoUrl: imgs[0]?.url ?? "" })} />
+                    </div>
+                  );
+                })}
+              </div>
+              {homepage.brands.items.length < 30 && (
+                <Button type="button" size="sm" variant="outline" className="justify-self-start" onClick={() => setH("brands", { ...homepage.brands, items: [...homepage.brands.items, { name: "", logoUrl: "" }] })}><Plus /> Add brand</Button>
+              )}
             </CardContent>
           </Card>
           <Card>

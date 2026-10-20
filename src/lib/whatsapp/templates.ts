@@ -1,4 +1,4 @@
-import { formatAmount } from "@/lib/utils";
+import { formatAmount, jpegImageUrl } from "@/lib/utils";
 import { ORDER_STATUS_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, type OrderStatus } from "@/lib/constants";
 import { formatPhoneForDisplay } from "@/lib/phone";
 
@@ -10,7 +10,7 @@ import { formatPhoneForDisplay } from "@/lib/phone";
 export type OrderForMessage = {
   orderNumber: string;
   customerSnapshot: { name: string; phone: string };
-  items: { name: string; variantName?: string | null; quantity: number; lineTotal: number; slug?: string | null; image?: string | null }[];
+  items: { name: string; variantName?: string | null; quantity: number; unitPrice?: number; lineTotal: number; image?: string | null }[];
   subtotal: number;
   discount: number;
   deliveryCharge: number;
@@ -71,54 +71,58 @@ export function ownerTemplateParams(order: OrderForMessage, adminUrl: string): s
   ];
 }
 
+const DIVIDER = "━━━━━━━━━━━━━━━━";
+
 /**
  * Full formatted owner message (Cloud API "text" mode and the customer's wa.me hand-off).
- * With `siteUrl`, each item gets a link to its product page, so WhatsApp shows the
- * product photo as a link preview.
+ * With `siteUrl`, each item gets a direct link to its product photo (JPEG, so WhatsApp
+ * can preview it).
  */
 export function ownerTextMessage(order: OrderForMessage, adminUrl: string, siteUrl?: string): string {
   const a = order.shippingAddress;
-  const lines = itemSummaryLines(order);
+  const money = (paise: number) => `₹${formatAmount(paise)}`;
+  const pieces = order.items.reduce((n, i) => n + i.quantity, 0);
   const items = order.items.flatMap((i, k) => {
-    const link = siteUrl && i.slug ? new URL(`/products/${i.slug}`, siteUrl).toString() : "";
-    return [`• ${lines[k]}`, ...(link ? [`   📷 ${link}`] : [])];
+    const unit = i.unitPrice ?? Math.round(i.lineTotal / i.quantity);
+    const photo = siteUrl && i.image ? new URL(jpegImageUrl(i.image), siteUrl).toString() : "";
+    return [
+      `*${k + 1}. ${i.name}*${i.variantName ? ` _(${i.variantName})_` : ""}`,
+      `   ${i.quantity} × ${money(unit)} = *${money(i.lineTotal)}*`,
+      ...(photo ? [`   🖼️ Photo: ${photo}`] : []),
+      "",
+    ];
   });
   return [
-    "🛍️ *NEW ORDER — AARUDHRA SMART STORE*",
+    "🛍️ *NEW ORDER*",
+    "*Aarudhra Smart Store*",
+    DIVIDER,
+    `🧾 *Order:* ${order.orderNumber}`,
+    `📅 ${IST_TIME.format(new Date(order.createdAt))}`,
     "",
-    `Order ID: ${order.orderNumber}`,
+    "👤 *Customer*",
+    order.customerSnapshot.name,
+    `📞 ${formatPhoneForDisplay(order.customerSnapshot.phone)}`,
     "",
-    `Customer: ${order.customerSnapshot.name}`,
+    `📦 *Items* (${pieces} ${pieces === 1 ? "piece" : "pieces"})`,
     "",
-    `Phone: ${formatPhoneForDisplay(order.customerSnapshot.phone)}`,
-    "",
-    "Items:",
     ...items,
+    DIVIDER,
+    `Subtotal: ${money(order.subtotal)}`,
+    ...(order.discount > 0 ? [`Discount: −${money(order.discount)}`] : []),
+    `Delivery: ${order.deliveryCharge > 0 ? money(order.deliveryCharge) : "FREE"}`,
+    ...(order.tax > 0 ? [`GST: ${money(order.tax)}`] : []),
+    `💰 *TOTAL: ${money(order.totalAmount)}*`,
+    DIVIDER,
     "",
-    `Subtotal: ₹${formatAmount(order.subtotal)}`,
+    `💳 *Payment:* ${paymentMethodLabel(order.paymentMethod)} (${paymentStatusLabel(order.paymentStatus)})`,
+    ...(order.deliveryOption?.label ? [`🚚 *Delivery:* ${order.deliveryOption.label}`] : []),
     "",
-    `Discount: ₹${formatAmount(order.discount)}`,
+    "📍 *Deliver to*",
+    ...[a.fullName, a.line1, a.line2, a.landmark ? `Near ${a.landmark}` : "", `${a.city}, ${a.district}`, `${a.state} – ${a.pincode}`].filter(Boolean),
+    `📞 ${formatPhoneForDisplay(a.phone)}`,
     "",
-    `Delivery: ₹${formatAmount(order.deliveryCharge)}`,
-    "",
-    `Tax: ₹${formatAmount(order.tax)}`,
-    "",
-    `*TOTAL: ₹${formatAmount(order.totalAmount)}*`,
-    "",
-    `Payment Method: ${paymentMethodLabel(order.paymentMethod)}`,
-    "",
-    `Payment Status: ${paymentStatusLabel(order.paymentStatus)}`,
-    "",
-    "Delivery Address:",
-    [a.fullName, a.line1, a.line2, a.landmark ? `Landmark: ${a.landmark}` : "", `${a.city}, ${a.district}`, `${a.state} - ${a.pincode}`, `Ph: ${formatPhoneForDisplay(a.phone)}`]
-      .filter(Boolean)
-      .join("\n"),
-    "",
-    `Order Time: ${IST_TIME.format(new Date(order.createdAt))}`,
-    "",
-    "Please log in to the admin dashboard to manage this order.",
-    "",
-    `Admin Dashboard: ${adminUrl}`,
+    "🔗 *Manage this order:*",
+    adminUrl,
   ].join("\n");
 }
 

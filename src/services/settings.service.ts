@@ -27,17 +27,26 @@ function merge<T>(base: T, override: unknown): T {
   return out as T;
 }
 
+/** Fills in the default for every setting missing from `stored` (new settings, older saves). */
+export function withDefaults(stored: unknown): StoreSettings {
+  return merge(structuredClone(DEFAULT_SETTINGS), stored ?? {});
+}
+
 async function loadSettings(): Promise<StoreSettings> {
   await connectDB();
   const doc = await Settings.findOne({ key: KEY }).lean();
-  return merge(structuredClone(DEFAULT_SETTINGS), doc?.data ?? {});
+  return withDefaults(doc?.data);
 }
 
 // Settings change rarely: serve from the data cache (invalidated on every admin save).
 const loadSettingsCached = cached(loadSettings, "store-settings", [TAGS.settings], 300);
 
-/** Cached across requests and memoised per render. Use getSettingsFresh for writes/checkout. */
-export const getSettings = cache(() => loadSettingsCached());
+/**
+ * Cached across requests and memoised per render. Use getSettingsFresh for writes/checkout.
+ * Defaults are merged in again after the cache: an entry cached before a new setting
+ * existed (e.g. carried over from the previous deploy) still gets that setting's default.
+ */
+export const getSettings = cache(async () => withDefaults(await loadSettingsCached()));
 
 /** Uncached read, used by background jobs and tests. */
 export const getSettingsFresh = loadSettings;

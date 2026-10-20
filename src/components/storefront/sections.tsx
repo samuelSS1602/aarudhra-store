@@ -57,7 +57,7 @@ export function ProductRail({
       <div className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0 lg:grid-cols-4">
         {products.slice(0, 8).map((p) => (
           <div key={p.id} className="w-[46%] shrink-0 snap-start sm:w-auto">
-            <ProductCard product={p} />
+            <ProductCard product={p} photoSwipe={false} />
           </div>
         ))}
       </div>

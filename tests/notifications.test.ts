@@ -165,11 +165,12 @@ describe("WhatsApp webhooks", () => {
 });
 
 describe("owner WhatsApp order message", () => {
+  const photoId = "a".repeat(24);
   const order = {
     orderNumber: "AAS-1",
     customerSnapshot: { name: "Test", phone: "+919876500001" },
     items: [
-      { name: "Notebook", quantity: 2, lineTotal: 10000, slug: "notebook" },
+      { name: "Notebook", variantName: "Blue", quantity: 2, unitPrice: 5000, lineTotal: 10000, image: `/media/${photoId}.webp` },
       { name: "Pen", quantity: 1, lineTotal: 1000 },
     ],
     subtotal: 11000,
@@ -183,14 +184,29 @@ describe("owner WhatsApp order message", () => {
     createdAt: new Date(),
   };
 
-  it("links each product page so WhatsApp previews its photo", () => {
+  it("lists each item with its price and a direct link to its photo", () => {
     const msg = ownerTextMessage(order, "https://shop.example/admin/orders/1", "https://shop.example");
-    expect(msg).toContain("• 2 × Notebook");
-    expect(msg).toContain("📷 https://shop.example/products/notebook");
-    expect(msg.match(/📷/g)).toHaveLength(1); // items without a slug get no link
+    expect(msg).toContain("*1. Notebook* _(Blue)_");
+    expect(msg).toContain("2 × ₹50.00 = *₹100.00*");
+    expect(msg).toContain(`🖼️ Photo: https://shop.example/media/${photoId}.jpg`);
+    expect(msg).toContain("1 × ₹10.00 = *₹10.00*");
+    expect(msg.match(/🖼️/g)).toHaveLength(1); // items without a photo get no link
+    expect(msg).toContain("*Items* (3 pieces)");
+    expect(msg).toContain("💰 *TOTAL: ₹110.00*");
   });
 
-  it("omits product links when no public site URL is given", () => {
-    expect(ownerTextMessage(order, "http://localhost:3000/admin/orders/1")).not.toContain("📷");
+  it("hides zero discount/GST lines and shows free delivery", () => {
+    const msg = ownerTextMessage(order, "https://shop.example/admin/orders/1", "https://shop.example");
+    expect(msg).not.toContain("Discount");
+    expect(msg).not.toContain("GST");
+    expect(msg).toContain("Delivery: FREE");
+    const withCharges = ownerTextMessage({ ...order, discount: 500, tax: 900, deliveryCharge: 3000 }, "https://shop.example/admin/orders/1");
+    expect(withCharges).toContain("Discount: −₹5.00");
+    expect(withCharges).toContain("GST: ₹9.00");
+    expect(withCharges).toContain("Delivery: ₹30.00");
+  });
+
+  it("omits photo links when no site URL is given", () => {
+    expect(ownerTextMessage(order, "http://localhost:3000/admin/orders/1")).not.toContain("🖼️");
   });
 });

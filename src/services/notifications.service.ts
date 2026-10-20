@@ -168,7 +168,7 @@ async function deliver(log: NotificationLogDoc, order: OrderDoc, settings: Store
     const adminUrl = appUrl(`/admin/orders/${order._id}`);
     let result: SendResult;
     if (log.template === "text:new_order") {
-      result = await sendTextMessage({ to: log.recipient, body: ownerTextMessage(msgOrder, adminUrl, getEnv().NEXT_PUBLIC_APP_URL.startsWith("https://") ? getEnv().NEXT_PUBLIC_APP_URL : undefined) });
+      result = await sendTextMessage({ to: log.recipient, body: ownerTextMessage(msgOrder, adminUrl, getEnv().NEXT_PUBLIC_APP_URL) });
     } else {
       if (!log.template) throw new WhatsAppError("Owner template name is not configured", "TEMPLATE_NOT_CONFIGURED", false);
       result = await sendTemplateMessage({ to: log.recipient, templateName: log.template, language: t.language, bodyParams: ownerTemplateParams(msgOrder, adminUrl) });
