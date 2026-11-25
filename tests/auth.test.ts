@@ -3,6 +3,7 @@ import { setOtpProviderForTests, SmsProviderError, type OtpProvider } from "@/li
 import { requestOtp, verifyOtp } from "@/services/auth.service";
 import { OtpChallenge } from "@/models/OtpChallenge";
 import { User } from "@/models/User";
+import { AdminUser } from "@/models/AdminUser";
 import { POST as verifyRoute } from "@/app/api/auth/otp/verify/route";
 import { POST as requestRoute } from "@/app/api/auth/otp/request/route";
 import { GET as meRoute } from "@/app/api/auth/me/route";
@@ -203,5 +204,19 @@ describe("Admin authorization", () => {
     const r = await adminLoginRoute(request("/api/admin/auth/login", { body: { email: "boss@store.test", password: "Correct-Horse-9-Battery" } }), noParams);
     expect(r.status).toBe(200);
     expect((r.headers.get("set-cookie") ?? "").toLowerCase()).toContain("httponly");
+  });
+
+  it("lets staff sign in with their username (case-insensitive) as well as their email", async () => {
+    const a = await makeAdmin("owner", "shop@store.test", "Correct-Horse-9-Battery");
+    await AdminUser.updateOne({ _id: a.id }, { $set: { username: "aarudhra" } });
+
+    const byUsername = await adminLoginRoute(request("/api/admin/auth/login", { body: { login: " Aarudhra ", password: "Correct-Horse-9-Battery" } }), noParams);
+    expect(byUsername.status).toBe(200);
+    const byEmail = await adminLoginRoute(request("/api/admin/auth/login", { body: { login: "shop@store.test", password: "Correct-Horse-9-Battery" } }), noParams);
+    expect(byEmail.status).toBe(200);
+    const wrong = await adminLoginRoute(request("/api/admin/auth/login", { body: { login: "aarudhra", password: "Wrong-Horse-9-Battery" } }), noParams);
+    expect(wrong.status).toBe(401);
+    const unknown = await adminLoginRoute(request("/api/admin/auth/login", { body: { login: "nobody", password: "Correct-Horse-9-Battery" } }), noParams);
+    expect(unknown.status).toBe(401);
   });
 });

@@ -8,9 +8,9 @@ import { authenticateAdmin } from "@/services/admin-users.service";
 export const runtime = "nodejs";
 
 export const POST = route(async (req) => {
-  const { email, password } = await readJson(req, adminLoginSchema, 2048);
+  const { login, password } = await readJson(req, adminLoginSchema, 2048);
   const ip = getClientIp(req);
-  const admin = await authenticateAdmin(email, password, ip);
+  const admin = await authenticateAdmin(login, password, ip);
   const { token, maxAge } = await createAdminSession(admin._id, { ip, userAgent: getUserAgent(req) });
   const res = json({ ok: true, admin: { name: admin.name, role: admin.role } });
   setSessionCookie(res, ADMIN_COOKIE, token, maxAge);

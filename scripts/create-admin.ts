@@ -4,6 +4,9 @@
  *   npm run admin:create -- --email owner@example.com --name "Store Owner"
  *   npm run admin:create -- --email staff@example.com --name "Staff" --role staff --allow-additional
  *   npm run admin:create -- --email owner@example.com --reset-password
+ *   npm run admin:create -- --email owner@example.com --reset-password --username aarudhra
+ *
+ * --username sets a short sign-in name (staff can then sign in with it instead of the email).
  *
  * The password is typed at a hidden prompt (never a CLI argument, so it doesn't land in
  * shell history). For non-interactive environments set ADMIN_PASSWORD for one run only.
@@ -15,26 +18,40 @@ import { Writable } from "node:stream";
 import { parseArgs } from "node:util";
 import { connectDB, disconnectDB } from "../src/lib/mongodb";
 import { hashPassword } from "../src/lib/security/crypto";
-import { passwordSchema } from "../src/lib/validation/schemas";
+import { adminUsernameSchema, passwordSchema } from "../src/lib/validation/schemas";
 import { AdminUser, ADMIN_ROLES, type AdminRole } from "../src/models/AdminUser";
 import { AdminSession } from "../src/models/AdminSession";
 import { AuditLog } from "../src/models/misc";
 
 // PowerShell's npm shim strips "--flag" names, leaving bare values, so plain
 // positionals are also accepted:  npm run admin:create you@example.com "Your Name"
-const { values, positionals } = parseArgs({
+//                                 npm run admin:create you@example.com reset-password username=aarudhra
+const { values, positionals: rawPositionals } = parseArgs({
   allowPositionals: true,
   options: {
     email: { type: "string" },
     name: { type: "string" },
+    username: { type: "string" },
     role: { type: "string", default: "owner" },
     "allow-additional": { type: "boolean", default: false },
     "reset-password": { type: "boolean", default: false },
   },
 });
+const usernameArg = rawPositionals.find((p) => p.startsWith("username="));
+values.username ??= usernameArg?.slice("username=".length);
+if (rawPositionals.includes("reset-password")) values["reset-password"] = true;
+const positionals = rawPositionals.filter((p) => p !== usernameArg && p !== "reset-password");
 values.email ??= positionals.find((p) => p.includes("@"));
 values.name ??= positionals.filter((p) => !p.includes("@")).join(" ") || undefined;
-if (positionals.includes("reset-password")) values["reset-password"] = true;
+
+async function resolveUsername(forId?: unknown): Promise<string | undefined> {
+  if (values.username === undefined) return undefined;
+  const parsed = adminUsernameSchema.safeParse(values.username);
+  if (!parsed.success) throw new Error(parsed.error.issues[0]!.message);
+  const taken = await AdminUser.findOne({ username: parsed.data }, { _id: 1 }).lean();
+  if (taken && String(taken._id) !== String(forId)) throw new Error(`The username "${parsed.data}" is already used by another staff account.`);
+  return parsed.data;
+}
 
 function hiddenPrompt(question: string): Promise<string> {
   return new Promise((resolve) => {
@@ -75,8 +92,10 @@ async function main() {
   if (values["reset-password"]) {
     const admin = await AdminUser.findOne({ email });
     if (!admin) throw new Error("No staff account with that email.");
+    const username = await resolveUsername(admin._id);
     const pw = passwordSchema.safeParse(await getPassword());
     if (!pw.success) throw new Error(pw.error.issues[0]!.message);
+    if (username) admin.username = username;
     admin.passwordHash = await hashPassword(pw.data);
     admin.passwordChangedAt = new Date();
     admin.failedLoginCount = 0;
@@ -84,7 +103,7 @@ async function main() {
     await admin.save();
     await AdminSession.deleteMany({ adminId: admin._id });
     await AuditLog.create({ action: "admin.password_reset_cli", resourceType: "admin", resourceId: String(admin._id), adminName: "CLI" });
-    console.log(`✔ Password reset for ${email}. All sessions were signed out.`);
+    console.log(`✔ Password reset for ${email}${username ? ` (username: ${username})` : ""}. All sessions were signed out.`);
     return;
   }
 
@@ -95,13 +114,14 @@ async function main() {
     throw new Error("Staff accounts already exist. Add staff from /admin/admins, or pass --allow-additional.");
   }
   if (await AdminUser.exists({ email })) throw new Error("A staff account with this email already exists.");
+  const username = await resolveUsername();
 
   const pw = passwordSchema.safeParse(await getPassword());
   if (!pw.success) throw new Error(pw.error.issues[0]!.message);
 
-  const admin = await AdminUser.create({ name, email, role, passwordHash: await hashPassword(pw.data), passwordChangedAt: new Date() });
-  await AuditLog.create({ action: "admin.create_cli", resourceType: "admin", resourceId: String(admin._id), adminName: "CLI", sanitizedMetadata: { email, role } });
-  console.log(`✔ Created ${role} account for ${email}. Sign in at /admin/login.`);
+  const admin = await AdminUser.create({ name, email, username, role, passwordHash: await hashPassword(pw.data), passwordChangedAt: new Date() });
+  await AuditLog.create({ action: "admin.create_cli", resourceType: "admin", resourceId: String(admin._id), adminName: "CLI", sanitizedMetadata: { email, username, role } });
+  console.log(`✔ Created ${role} account for ${username ?? email}. Sign in at /admin/login.`);
 }
 
 main()

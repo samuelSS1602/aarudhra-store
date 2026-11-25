@@ -16,14 +16,15 @@ const LOCK_MINUTES = 15;
 // similar whether or not the email exists.
 let dummyHash: string | null = null;
 
-const INVALID = () => new AppError(401, "INVALID_CREDENTIALS", "Incorrect email or password.");
+const INVALID = () => new AppError(401, "INVALID_CREDENTIALS", "Incorrect username or password.");
 
-export async function authenticateAdmin(email: string, password: string, ip: string) {
+/** `login` is either the account's email or its username (already trimmed + lower-cased). */
+export async function authenticateAdmin(login: string, password: string, ip: string) {
   await connectDB();
   await enforceRateLimit(`admin-login:ip:${ip}`, 20, 15 * 60, "Too many sign-in attempts. Please wait 15 minutes.");
-  await enforceRateLimit(`admin-login:email:${email}`, 10, 15 * 60, "Too many sign-in attempts. Please wait 15 minutes.");
+  await enforceRateLimit(`admin-login:id:${login}`, 10, 15 * 60, "Too many sign-in attempts. Please wait 15 minutes.");
 
-  const admin = await AdminUser.findOne({ email }).select("+passwordHash");
+  const admin = await AdminUser.findOne(login.includes("@") ? { email: login } : { username: login }).select("+passwordHash");
   if (!admin) {
     dummyHash ??= await hashPassword(`dummy-${Math.random()}`);
     await verifyPassword(password, dummyHash);

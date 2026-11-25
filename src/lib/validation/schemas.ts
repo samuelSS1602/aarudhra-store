@@ -20,10 +20,20 @@ export const otpVerifySchema = z.object({
   phone: z.string().trim().min(1).max(20),
   code: z.string().trim().regex(/^\d{4,8}$/, "Enter the 6-digit code"),
 });
-export const adminLoginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
-  password: z.string().min(1, "Password is required").max(200),
-});
+export const adminUsernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9][a-z0-9._-]{2,31}$/, "Username must be 3–32 characters: letters, numbers, dots, dashes or underscores");
+
+// `login` is a username or an email. `email` is still accepted for older clients.
+export const adminLoginSchema = z.preprocess(
+  (v) => (v && typeof v === "object" ? { login: (v as Record<string, unknown>).login ?? (v as Record<string, unknown>).email, password: (v as Record<string, unknown>).password } : v),
+  z.object({
+    login: z.string({ required_error: "Enter your username or email" }).trim().toLowerCase().min(1, "Enter your username or email").max(200),
+    password: z.string().min(1, "Password is required").max(200),
+  }),
+);
 
 /* ------------------------------- Customer ------------------------------- */
 

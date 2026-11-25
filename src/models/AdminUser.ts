@@ -7,6 +7,8 @@ const AdminUserSchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 100 },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true, maxlength: 200 },
+    // Optional short sign-in name (e.g. "aarudhra"). Staff can sign in with this or their email.
+    username: { type: String, unique: true, sparse: true, trim: true, lowercase: true, maxlength: 32 },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ADMIN_ROLES, required: true, default: "staff" },
     status: { type: String, enum: ["active", "disabled"], default: "active" },

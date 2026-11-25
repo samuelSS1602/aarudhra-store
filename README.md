@@ -261,6 +261,7 @@ npm run admin:create -- --email owner@yourdomain.in --name "Store Owner"
 ```
 
 - Once the first account exists, the script refuses to create more unless you pass `--allow-additional`. Add further staff from **Admin → Admin users**.
+- Staff can sign in with a short **username** instead of their email. Set one with `--username aarudhra` (when creating, or together with `--reset-password`). In PowerShell, use the plain form: `npm run admin:create owner@yourdomain.in reset-password username=aarudhra`.
 - Lost password: `npm run admin:create -- --email owner@yourdomain.in --reset-password` (this signs the account out everywhere).
 - For non-interactive environments, set `ADMIN_PASSWORD` for a single run only. Never commit it.
 

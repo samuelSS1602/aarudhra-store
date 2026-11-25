@@ -11,7 +11,7 @@ import { Field } from "@/components/checkout/address-fields";
 
 export function AdminLoginForm({ next }: { next: string }) {
   const router = useRouter();
-  const [email, setEmail] = React.useState("");
+  const [login, setLogin] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -21,7 +21,7 @@ export function AdminLoginForm({ next }: { next: string }) {
     setError(null);
     setLoading(true);
     try {
-      await apiFetch("/api/admin/auth/login", { body: { email, password } });
+      await apiFetch("/api/admin/auth/login", { body: { login, password } });
       router.replace(next);
       router.refresh();
     } catch (err) {
@@ -35,8 +35,8 @@ export function AdminLoginForm({ next }: { next: string }) {
   return (
     <Card className="p-6">
       <form onSubmit={submit} className="space-y-4">
-        <Field id="email" label="Email">
-          <Input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+        <Field id="login" label="Username">
+          <Input id="login" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus />
         </Field>
         <Field id="password" label="Password">
           <Input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required aria-describedby={error ? "login-error" : undefined} />
